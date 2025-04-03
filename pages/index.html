@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在庫管理</title>
+    <script defer src="script.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .inventory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        button.delete {
+            background: red;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>在庫管理</h2>
+        <input type="text" id="username" placeholder="ユーザー名">
+        <input type="password" id="password" placeholder="パスワード">
+        <button onclick="login()">ログイン</button>
+        <p id="loginStatus"></p>
+        <input type="text" id="itemName" placeholder="商品名" disabled>
+        <input type="number" id="itemQuantity" placeholder="数量" disabled>
+        <button onclick="addItem()" disabled>追加</button>
+        <div id="inventoryList"></div>
+    </div>
+</body>
+</html>
