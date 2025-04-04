@@ -134,3 +134,6 @@ _NCrunch*
 
 # VIsual Studio
 .vs/
+
+# appsetting
+appsetting.json
