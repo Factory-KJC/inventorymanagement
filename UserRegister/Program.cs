@@ -21,11 +21,11 @@ class Program
         Console.Write("パスワード: ");
         string password = ReadPassword();
 
-        // パスワードをハッシュ化
-        string hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
+        //// パスワードをハッシュ化
+        //string hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
 
         // JSONデータを作成
-        var user = new { Username = username, Password_Hash = hashedPassword };
+        var user = new { Username = username, Password = password };
         string jsonData = JsonSerializer.Serialize(user);
         var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 

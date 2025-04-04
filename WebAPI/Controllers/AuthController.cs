@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using BCrypt.Net;
+using Microsoft.AspNetCore.Identity.Data;
 
 [Route("api/auth")]
 [ApiController]
@@ -21,34 +22,35 @@ public class AuthController : ControllerBase
         _config = config;
     }
 
+    // ログインエンドポイント
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] UserLogin user)
+    public IActionResult Login([FromBody] UserLogin request)
     {
-        var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == user.Username);
-        if (existingUser == null || !BCrypt.Net.BCrypt.Verify(user.Password, existingUser.Password_Hash))
-        {
-            return Unauthorized(new { message = "ユーザー名またはパスワードが正しくありません。" });
-        }
+        var user = _context.Users.SingleOrDefault(u => u.Username == request.Username);
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password_Hash))
+            return Unauthorized(new { message = "ユーザー名またはパスワードが違います" });
 
-        var token = GenerateJwtToken(existingUser);
+        var token = GenerateJwtToken(user);
         return Ok(new { token });
     }
 
+
+    // JWTトークンを生成するメソッド
     private string GenerateJwtToken(User user)
     {
-        var jwtSettings = _config.GetSection("Jwt");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]);
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, user.Username) }),
+            Expires = DateTime.UtcNow.AddHours(2),
+            Issuer = _config["Jwt:Issuer"],
+            Audience = _config["Jwt:Audience"],
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+        };
 
-        var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"],
-            audience: jwtSettings["Audience"],
-            claims: new[] { new Claim(ClaimTypes.Name, user.Username) },
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
     }
 }
 

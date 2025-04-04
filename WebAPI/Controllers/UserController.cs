@@ -21,19 +21,22 @@ namespace InventoryAPI.Controllers
 
         // 🔹 ユーザー登録エンドポイント
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] User user)
+        public IActionResult Register([FromBody] RegisterRequest request)
         {
-            if (await _context.Users.AnyAsync(u => u.Username == user.Username))
-            {
-                return BadRequest("❌ ユーザー名は既に使用されています。");
-            }
+            if (_context.Users.Any(u => u.Username == request.Username))
+                return BadRequest(new { message = "❌ このユーザー名は既に使用されています" });
 
-            user.Password_Hash = BCrypt.Net.BCrypt.HashPassword(user.Password_Hash); // 再ハッシュ（念のため）
-
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
+            var user = new User { Username = request.Username, Password_Hash = hashedPassword };
             _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            _context.SaveChanges();
 
-            return Ok("✅ ユーザー登録成功！");
+            return Ok(new { message = "✅ ユーザー登録成功" });
         }
+    }
+    public class RegisterRequest
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
     }
 }
