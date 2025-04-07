@@ -49,10 +49,19 @@ async function loadInventory() {
         const div = document.createElement("div");
         div.classList.add("inventory-item");
         div.innerHTML = `
-            <span>${item.name} (${item.quantity})</span>
+            <span>${item.name} (${item.quantity}) </span>
+            <svg id="barcode-${item.barcode}"></svg>
             <button class="delete" onclick="deleteItem(${item.id})">削除</button>
         `;
         list.appendChild(div);
+
+        JsBarcode(`#barcode-${item.barcode}`, item.barcode, {
+            format: "EAN13",  // EAN13が準標的なJANコード形式
+            lineColor: "#000",
+            width: 2,
+            height: 50,
+            displayValue: true
+        });
     });
 }
 
@@ -60,6 +69,7 @@ async function loadInventory() {
 async function addItem() {
     const name = document.getElementById("itemName").value.trim();
     const quantity = document.getElementById("itemQuantity").value;
+    const barcode = document.getElementById("itemBarcode").value;
 
     if (!name || quantity <= 0) {
         alert("正しい商品名と数量を入力してください");
@@ -72,11 +82,12 @@ async function addItem() {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ name, quantity: parseInt(quantity) })
+        body: JSON.stringify({ name, quantity: parseInt(quantity), barcode })
     });
 
     document.getElementById("itemName").value = "";
     document.getElementById("itemQuantity").value = "";
+    document.getElementById("itemBarcode").value = ""
     loadInventory();
 }
 
@@ -89,9 +100,11 @@ async function deleteItem(id) {
     loadInventory();
 }
 
+
 // ログイン成功後に在庫管理のUIを有効化
 function enableInventoryControls() {
     document.getElementById("itemName").disabled = false;
     document.getElementById("itemQuantity").disabled = false;
+    document.getElementById("itemBarcode").disabled = false;
     document.querySelector("button[onclick='addItem()']").disabled = false;
 }

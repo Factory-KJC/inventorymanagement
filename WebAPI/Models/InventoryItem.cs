@@ -13,19 +13,18 @@ namespace InventoryAPI.Models
         [Required]
         public string Name { get; set; }
 
-        public string Category { get; set; } = "その他";
+        public string? Category { get; set; } = "その他";
 
         [Range(0, int.MaxValue)]
         public int Quantity { get; set; }
 
         [Range(0, double.MaxValue)]
-        public decimal Price { get; set; }
+        public decimal? Price { get; set; }
 
-        [Required]
-        public string Barcode { get; set; }
+        public string? Barcode { get; set; }
 
         public string? Supplier { get; set; }
-        public string Storage_Location { get; set; }
+        public string? Storage_Location { get; set; }
         public DateTime Entry_Date { get; set; } = DateTime.UtcNow;
         public DateTime? Expiration_Date { get; set; }
         public string? Notes { get; set; }
