@@ -1,0 +1,22 @@
+﻿<Window x:Class="InventoryClient.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ログイン" Height="200" Width="300" WindowStartupLocation="CenterOwner">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <Label Content="ユーザー名:"/>
+            <TextBox Name="UsernameBox"/>
+
+            <Label Content="パスワード:" Margin="0,10,0,0"/>
+            <PasswordBox Name="PasswordBox"/>
+
+            <Button Content="ログイン" Click="LoginButton_Click" Margin="0,15,0,0" HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>
