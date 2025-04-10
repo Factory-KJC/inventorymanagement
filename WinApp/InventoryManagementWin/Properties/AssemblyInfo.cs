@@ -7,11 +7,11 @@ using System.Windows;
 // アセンブリに関する一般的な情報は、次の方法で制御されます
 // アセンブリに関連付けられている情報を変更するには、
 // これらの属性値を変更してください。
-[assembly: AssemblyTitle("InventoryManagementWin")]
+[assembly: AssemblyTitle("InventoryClient")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("InventoryManagementWin")]
+[assembly: AssemblyProduct("InventoryClient")]
 [assembly: AssemblyCopyright("Copyright ©  2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

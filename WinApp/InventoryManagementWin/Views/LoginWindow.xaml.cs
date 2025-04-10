@@ -5,13 +5,15 @@ namespace InventoryClient.Views
 {
     public partial class LoginWindow : Window
     {
-        public LoginViewModel ViewModel => DataContext as LoginViewModel;
         public LoginWindow()
         {
             InitializeComponent();
             var vm = new LoginViewModel();
             vm.CloseAction = () => this.DialogResult = true;
             this.DataContext = vm;
+
+            // 初期パスワードも表示に反映
+            PasswordBox.Password = vm.Password;
         }
 
         private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)

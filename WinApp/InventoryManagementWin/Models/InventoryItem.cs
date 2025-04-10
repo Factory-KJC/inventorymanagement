@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace InventoryManagementWin.Models
+namespace InventoryClient.Models
 {
     public class InventoryItem
     {

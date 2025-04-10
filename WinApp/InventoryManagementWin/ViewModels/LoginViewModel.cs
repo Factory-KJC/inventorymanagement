@@ -1,13 +1,17 @@
 ﻿using System;
+using System.IO;
 using System.ComponentModel;
+using System.Configuration;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
+using InventoryClient.Models;
 
 namespace InventoryClient.ViewModels
 {
     public class LoginViewModel : INotifyPropertyChanged
     {
+
         private string _username;
         private string _password;
 
@@ -30,10 +34,27 @@ namespace InventoryClient.ViewModels
 
         public LoginViewModel()
         {
+            LoadDefaultCredentials();
             SubmitCommand = new RelayCommand(OnSubmit);
         }
 
-        
+        private void LoadDefaultCredentials()
+        {
+            if (File.Exists(Property.settingFileName))
+            {
+                var json = File.ReadAllText(Property.settingFileName);
+                var setting = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
+                if (!String.IsNullOrEmpty(setting.DefaultUsername))
+                {
+                    Username = setting.DefaultUsername;
+                }
+                if (!String.IsNullOrEmpty(setting.DecodedPassword()))
+                {
+                    Password = setting.DecodedPassword();
+                }
+            }
+        }
+
         private void OnSubmit()
         {
             LoginCompleted?.Invoke(this, new LoginEventArgs

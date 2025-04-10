@@ -9,7 +9,6 @@ using System.Windows.Input;
 using InventoryClient.Models;
 using InventoryClient.Views;
 using InventoryClient.ViewModels;
-using InventoryManagementWin.Models;
 using Newtonsoft.Json;
 using System.Configuration;
 
@@ -24,11 +23,13 @@ namespace InventoryClient.ViewModels
 
         public ICommand LoginCommand { get; }
         public ICommand LoadInventoryCommand { get; }
+        public ICommand OpenSettingCommand { get; }
 
         public MainViewModel()
         {
             LoginCommand = new RelayCommand(Login);
             LoadInventoryCommand = new RelayCommand(LoadInventory);
+            OpenSettingCommand = new RelayCommand(OpenSettingWindow);
         }
         private async void Login()
         {
@@ -69,6 +70,19 @@ namespace InventoryClient.ViewModels
             }
         }
 
+        /// <summary>
+        /// 設定ウィンドウを開く
+        /// </summary>
+        public void OpenSettingWindow()
+        {
+            var viewModel = new SettingViewModel();
+            var settingWindow = new SettingWindow
+            {
+                DataContext = viewModel
+            };
+            settingWindow.Owner = Application.Current.MainWindow;
+            settingWindow.ShowDialog();
+        }
 
         /// <summary>
         /// 在庫一覧を更新
