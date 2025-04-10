@@ -13,7 +13,7 @@ namespace InventoryClient
     /// </summary>
     public static class Property
     {
-        public static string settingFileName = ConfigurationManager.AppSettings["UserSettingFileName"];
+        public static string settingFileName = ConfigurationManager.AppSettings["UserSettingFileName"]; // ユーザー設定ファイル名
     }
 
     /// <summary>

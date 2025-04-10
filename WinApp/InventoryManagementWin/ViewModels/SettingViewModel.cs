@@ -39,6 +39,9 @@ public class SettingViewModel : ViewModelBase
         SaveCommand = new RelayCommand(SaveSettings);
     }
 
+    /// <summary>
+    /// 設定ファイルから設定を読み込む
+    /// </summary>
     private void LoadSettings()
     {
         if (File.Exists(Property.settingFileName))
@@ -52,6 +55,9 @@ public class SettingViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 設定ファイルに設定を保存
+    /// </summary>
     private void SaveSettings()
     {
         var setting = new AppSettings
