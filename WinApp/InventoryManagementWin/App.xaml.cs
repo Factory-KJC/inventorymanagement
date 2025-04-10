@@ -18,6 +18,8 @@ namespace InventoryManagementWin
         public void Load()
         {
             Host = ConfigurationManager.AppSettings["Host"];
+            DefaultUser = ConfigurationManager.AppSettings["Username"]:
+            EncryptedDefaultPass = ConfigurationManager.AppSettings["EncryptedPassword"];
         }
         public void Save()
         {
