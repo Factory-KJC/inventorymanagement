@@ -12,6 +12,7 @@
             <materialDesing:PackIcon Kind="Settings"/>
         </Button>
         <Button Name="LoginButton" Content="ログイン" Margin="0,0,0,10" Command="{Binding LoginCommand}"/>
+        <Button Name="AddButton" Content="在庫追加" Margin="0,0,0,10" Command="{Binding OpenAddWindowCommand}"></Button>
         <Button Name="LoadButton" Content="更新 " Margin="0,0,0,10" Command="{Binding LoadInventoryCommand}"/>
         <Grid>
             <DataGrid ItemsSource="{Binding InventoryItems}" AutoGenerateColumns="True" Margin="10"/>

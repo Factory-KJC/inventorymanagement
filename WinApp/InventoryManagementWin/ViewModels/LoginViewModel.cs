@@ -9,7 +9,7 @@ using InventoryClient.Models;
 
 namespace InventoryClient.ViewModels
 {
-    public class LoginViewModel : INotifyPropertyChanged
+    public class LoginViewModel : ViewModelBase
     {
 
         private string _username;

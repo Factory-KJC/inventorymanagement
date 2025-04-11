@@ -14,7 +14,7 @@ using System.Configuration;
 
 namespace InventoryClient.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged
+    public class MainViewModel : ViewModelBase
     {
         private static readonly HttpClient client = new HttpClient();
         private string jwtToken;
@@ -24,12 +24,14 @@ namespace InventoryClient.ViewModels
         public ICommand LoginCommand { get; }
         public ICommand LoadInventoryCommand { get; }
         public ICommand OpenSettingCommand { get; }
+        public ICommand OpenAddWindowCommand { get; }
 
         public MainViewModel()
         {
             LoginCommand = new RelayCommand(Login);
             LoadInventoryCommand = new RelayCommand(LoadInventory);
             OpenSettingCommand = new RelayCommand(OpenSettingWindow);
+            OpenAddWindowCommand = new RelayCommand(OpenAddWindow);
         }
         private async void Login()
         {
@@ -82,6 +84,20 @@ namespace InventoryClient.ViewModels
             };
             settingWindow.Owner = Application.Current.MainWindow;
             settingWindow.ShowDialog();
+        }
+
+        /// <summary>
+        /// 在庫追加ウィンドウを開く
+        /// </summary>
+        public void OpenAddWindow()
+        {
+            var viewModel = new AddInventoryVIewModel();
+            var addInventoryWIndow = new AddInventoryWindow
+            {
+                DataContext = viewModel
+            };
+            addInventoryWIndow.Owner = Application.Current.MainWindow;
+            addInventoryWIndow.ShowDialog();
         }
 
         /// <summary>
