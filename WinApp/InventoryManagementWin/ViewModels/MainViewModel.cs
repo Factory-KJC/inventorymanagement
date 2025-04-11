@@ -50,8 +50,9 @@ namespace InventoryClient.ViewModels
                     };
 
                     // サーバーにログインデータを送信
+                    var setting = new SettingViewModel();
                     var content = new StringContent(JsonConvert.SerializeObject(loginData), Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync("https://localhost:44394/api/auth/login", content);
+                    var response = await client.PostAsync($"{setting.HostName}/api/auth/login", content);
 
                     loginWindow.Close(); // ウィンドウを閉じる
 

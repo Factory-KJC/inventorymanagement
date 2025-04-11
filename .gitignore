@@ -138,3 +138,4 @@ _NCrunch*
 # appsetting
 appsetting.json
 WebAPI/appsettings.json
+/WebAPI/appsettings.json
