@@ -92,7 +92,7 @@ namespace InventoryClient.ViewModels
         /// </summary>
         public void OpenAddWindow()
         {
-            var viewModel = new AddInventoryVIewModel();
+            var viewModel = new AddInventoryViewModel();
             var addInventoryWIndow = new AddInventoryWindow
             {
                 DataContext = viewModel
@@ -139,8 +139,5 @@ namespace InventoryClient.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

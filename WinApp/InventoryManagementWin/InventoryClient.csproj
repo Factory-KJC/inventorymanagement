@@ -125,8 +125,8 @@
     <Compile Include="ViewModels\ViewModelBase.cs" />
     <Compile Include="ViewModels\LoginViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
-    <Compile Include="Views\AddInventoryWIndow.xaml.cs">
-      <DependentUpon>AddInventoryWIndow.xaml</DependentUpon>
+    <Compile Include="Views\AddInventoryWindow.xaml.cs">
+      <DependentUpon>AddInventoryWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\LoginWindow.xaml.cs">
       <DependentUpon>LoginWindow.xaml</DependentUpon>
@@ -134,7 +134,7 @@
     <Compile Include="Views\SettingWindow.xaml.cs">
       <DependentUpon>SettingWindow.xaml</DependentUpon>
     </Compile>
-    <Page Include="Views\AddInventoryWIndow.xaml">
+    <Page Include="Views\AddInventoryWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

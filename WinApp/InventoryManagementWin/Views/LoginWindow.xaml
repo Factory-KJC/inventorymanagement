@@ -3,9 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:InventoryClient.ViewModels"
         Title="ログイン" Height="200" Width="300">
-    <Window.DataContext>
-        <vm:LoginViewModel />
-    </Window.DataContext>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>

@@ -15,7 +15,7 @@ using System.Configuration;
 
 namespace InventoryClient.ViewModels
 {
-    public class AddInventoryVIewModel : INotifyPropertyChanged
+    public class AddInventoryViewModel : ViewModelBase
     {
         public string Name { get; set; }
         public string Category { get; set; }
@@ -40,7 +40,7 @@ namespace InventoryClient.ViewModels
 
         public ICommand AddInventoryCommand { get; }
 
-        public AddInventoryVIewModel()
+        public AddInventoryViewModel()
         {
             AddInventoryCommand = new RelayCommand(AddInventory);
         }
@@ -79,11 +79,6 @@ namespace InventoryClient.ViewModels
                 MessageBox.Show("登録に失敗しました。");
             }
             client.Dispose();
-        }
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }
