@@ -52,19 +52,24 @@ namespace InventoryClient.ViewModels
                     // サーバーにログインデータを送信
                     var setting = new SettingViewModel();
                     var content = new StringContent(JsonConvert.SerializeObject(loginData), Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync($"{setting.HostName}/api/auth/login", content);
-
                     loginWindow.Close(); // ウィンドウを閉じる
-
-                    if (response.IsSuccessStatusCode)
+                    if (string.IsNullOrEmpty(setting.HostName))
                     {
-                        var result = JsonConvert.DeserializeObject<Dictionary<string, string>>(await response.Content.ReadAsStringAsync());
-                        jwtToken = result["token"];
-                        MessageBox.Show("ログイン成功");
+                        MessageBox.Show("ホスト名が無効です\n設定を確認してください");
                     }
                     else
                     {
-                        MessageBox.Show("ログイン失敗");
+                        var response = await client.PostAsync($"{setting.HostName}/api/auth/login", content);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var result = JsonConvert.DeserializeObject<Dictionary<string, string>>(await response.Content.ReadAsStringAsync());
+                            jwtToken = result["token"];
+                            MessageBox.Show("ログイン成功");
+                        }
+                        else
+                        {
+                            MessageBox.Show("ログイン失敗");
+                        }
                     }
                 };
 
