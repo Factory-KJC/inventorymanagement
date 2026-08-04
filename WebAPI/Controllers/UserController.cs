@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using InventoryAPI.Data;
@@ -8,6 +8,9 @@ using System;
 
 namespace InventoryAPI.Controllers
 {
+    /// <summary>
+    /// ユーザー管理APIのコントローラー
+    /// </summary>
     [Route("api/users")]
     [ApiController]
     public class UserController : ControllerBase
@@ -19,7 +22,11 @@ namespace InventoryAPI.Controllers
             _context = context;
         }
 
-        // 🔹 ユーザー登録エンドポイント
+        /// <summary>
+        /// ユーザー登録エンドポイント
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterRequest request)
         {
@@ -34,9 +41,13 @@ namespace InventoryAPI.Controllers
             return Ok(new { message = "✅ ユーザー登録成功" });
         }
     }
+
+    /// <summary>
+    /// ユーザー登録リクエストのモデル
+    /// </summary>
     public class RegisterRequest
     {
-        public string Username { get; set; }
-        public string Password { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using InventoryAPI.Models;
 
 namespace InventoryAPI.Data

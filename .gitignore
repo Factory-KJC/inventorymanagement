@@ -137,5 +137,6 @@ _NCrunch*
 
 # appsetting
 appsetting.json
-WebAPI/appsettings.json
-/WebAPI/appsettings.json
+
+# Local container secrets
+.env

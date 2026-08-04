@@ -10,9 +10,12 @@ using System;
 
 namespace InventoryAPI.Controllers
 {
+    /// <summary>
+    /// 在庫管理APIのコントローラー
+    /// </summary>
     [Route("api/inventory")]
     [ApiController]
-    [Authorize]  // JWT�F�؂��K�v
+    [Authorize]  // JWT認証が必要
     public class InventoryController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -22,14 +25,22 @@ namespace InventoryAPI.Controllers
             _context = context;
         }
 
-        // ?? �݌Ɉꗗ���擾�iGET /api/inventory�j
+        /// <summary>
+        /// 在庫一覧を取得するエンドポイント（GET /api/inventory）
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<InventoryItems>>> GetInventoryItems()
         {
             return await _context.InventoryItems.ToListAsync();
         }
 
-        // ?? �w�肵��ID�̍݌ɂ��擾�iGET /api/inventory/{id}�j
+
+        /// <summary>
+        /// 指定したIDの在庫を取得するエンドポイント（GET /api/inventory/{id}）
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpGet("{id}")]
         public async Task<ActionResult<InventoryItems>> GetInventoryItem(int id)
         {
@@ -41,7 +52,11 @@ namespace InventoryAPI.Controllers
             return item;
         }
 
-        // ?? �݌ɂ�ǉ��iPOST /api/inventory�j
+        /// <summary>
+        /// 在庫を追加するエンドポイント（POST /api/inventory）
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
         [HttpPost]
         public async Task<ActionResult<InventoryItems>> CreateInventoryItem(InventoryItems item)
         {
@@ -50,7 +65,12 @@ namespace InventoryAPI.Controllers
             return CreatedAtAction(nameof(GetInventoryItem), new { id = item.Id }, item);
         }
 
-        // ?? �݌ɂ��X�V�iPUT /api/inventory/{id}�j
+        /// <summary>
+        /// 在庫を更新するエンドポイント（PUT /api/inventory/{id}）
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="item"></param>
+        /// <returns></returns>
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateInventoryItem(int id, InventoryItems item)
         {
@@ -80,7 +100,11 @@ namespace InventoryAPI.Controllers
             return NoContent();
         }
 
-        // ?? �݌ɂ��폜�iDELETE /api/inventory/{id}�j
+        /// <summary>
+        /// 在庫を削除するエンドポイント（DELETE /api/inventory/{id}）
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteInventoryItem(int id)
         {
@@ -96,7 +120,11 @@ namespace InventoryAPI.Controllers
             return NoContent();
         }
 
-        // ?? �݌ɂ����݂��邩�m�F
+        /// <summary>
+        /// 在庫が存在するか確認するエンドポイント
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         private bool InventoryItemExists(int id)
         {
             return _context.InventoryItems.Any(e => e.Id == id);
