@@ -9,12 +9,14 @@
 
 完了条件: `product-concept.md` と `architecture.md` の未決事項が解消している。
 
-## Phase 1 — APIの縦切り
+## Phase 1 — APIの縦切り（完了）
 
 - 新ソリューションとモジュール構成
 - PostgreSQL、EF Core Migration、開発用シード
 - 商品登録、入庫、消費、在庫一覧、履歴
 - ドメインルールとAPIの自動テスト
+
+実装済み: 商品、保管場所、期限別ロット、入庫、FEFO消費、履歴、冪等性、初回Migration、HTTP統合テスト。
 
 完了条件: APIだけで「登録→入庫→消費→履歴確認」が再現できる。
 

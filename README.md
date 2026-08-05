@@ -21,7 +21,7 @@
 
 全体方針は [プロダクト構想](docs/product-concept.md)、技術構成は [アーキテクチャ](docs/architecture.md)、実装順は [ロードマップ](docs/roadmap.md) を参照してください。
 
-APIはLinuxコンテナとして構築し、Windows開発環境とDebian本番環境で同じイメージを使用します。起動方法は[Docker開発・Debian配備](docs/deployment.md)を参照してください。
+APIはLinuxコンテナとして構築し、Windows開発環境とDebian本番環境で同じイメージを使用します。起動方法は[Docker開発・Debian配備](docs/deployment.md)、APIの現在の機能は[API利用ガイド](docs/api.md)を参照してください。
 
 ## 構成
 
@@ -43,6 +43,6 @@ Windows WPF ─────── HTTPS ──┘
 - 買い物完了を入庫へ変換できる
 - WPFでスキャン登録と買い物リスト印刷ができる
 
-## 既存コード
+## 実装状況
 
-`WebAPI/`、`pages/`、`WinApp/`、`UserRegister/` は旧試作です。新モデルの確定前に破壊的移行をしないため現時点では残し、MVPを縦に実装してから段階的に置き換えます。
+`WebAPI/`は新しい商品・ロット・入出庫モデルへ移行済みです。`pages/`、`WinApp/`、`UserRegister/`は旧試作のため、ロードマップに従って段階的に置き換えます。

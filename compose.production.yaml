@@ -2,7 +2,7 @@ services:
   api:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      Database__EnsureCreated: "true"
+      Database__AutoMigrate: "true"
 
   caddy:
     image: caddy:2-alpine

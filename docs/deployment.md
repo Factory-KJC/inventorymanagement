@@ -51,6 +51,8 @@ WEB_ORIGIN=https://stock.example.com
 openssl rand -base64 48
 ```
 
+`.env`に`$`を含む値を直接書く場合、Composeの変数展開を避けるため値全体をシングルクォートで囲んでください。上記のBase64生成値は通常この問題を避けられます。
+
 起動します。
 
 ```bash
@@ -71,9 +73,16 @@ docker image prune -f
 
 更新前にPostgreSQLのバックアップを取得します。DBスキーマが正式なMigration管理へ移行するまでは破壊的なモデル変更を行いません。
 
-## 現段階のDB初期化
+## DB Migration
 
-現在の旧試作APIにはEF Core Migrationが存在しないため、`Database__EnsureCreated=true`で初回テーブルを作成します。新ドメインモデルを実装するPhase 1でMigrationへ切り替え、その時点で本番の`EnsureCreated`を無効化します。これは移行期間中の暫定措置です。
+起動時に`Database__AutoMigrate=true`で未適用のEF Core Migrationを適用します。APIを複数台へ増やす場合は同時Migrationを避けるため、配備ジョブから一度だけ適用する方式へ変更します。
+
+Migrationを追加する場合はリポジトリルートで実行します。
+
+```bash
+dotnet tool restore
+dotnet tool run dotnet-ef migrations add <MigrationName> --project WebAPI/InventoryAPI.csproj --startup-project WebAPI/InventoryAPI.csproj --output-dir Data/Migrations
+```
 
 ## バックアップ例
 

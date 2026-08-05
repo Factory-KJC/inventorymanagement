@@ -28,17 +28,20 @@ namespace InventoryAPI.Controllers
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPost("register")]
-        public IActionResult Register([FromBody] RegisterRequest request)
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
         {
-            if (_context.Users.Any(u => u.Username == request.Username))
-                return BadRequest(new { message = "❌ このユーザー名は既に使用されています" });
+            var username = request.Username.Trim();
+            if (username.Length < 3 || request.Password.Length < 12)
+                return BadRequest(new { message = "ユーザー名は3文字以上、パスワードは12文字以上にしてください。" });
+            if (await _context.Users.AnyAsync(cancellationToken))
+                return Conflict(new { message = "初回ユーザーは登録済みです。追加メンバー機能は現在未実装です。" });
 
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
-            var user = new User { Username = request.Username, Password_Hash = hashedPassword };
+            var user = new User { Username = username, Password_Hash = hashedPassword };
             _context.Users.Add(user);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync(cancellationToken);
 
-            return Ok(new { message = "✅ ユーザー登録成功" });
+            return Ok(new { message = "ユーザー登録に成功しました。" });
         }
     }
 

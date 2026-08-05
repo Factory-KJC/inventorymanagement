@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json.Serialization;
+using InventoryAPI.Application.Inventory;
 using InventoryAPI.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +49,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(connectionString));
-builder.Services.AddControllers();
+builder.Services.AddScoped<InventoryService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddProblemDetails();
+builder.Services.AddControllers().AddJsonOptions(options =>
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -71,6 +77,8 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -88,12 +96,12 @@ app.MapGet("/health/ready", async (ApplicationDbContext db, CancellationToken ca
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 app.MapControllers();
 
-if (builder.Configuration.GetValue("Database:EnsureCreated", false))
-    await CreateDatabaseAsync(app.Services);
+if (builder.Configuration.GetValue("Database:AutoMigrate", false))
+    await MigrateDatabaseAsync(app.Services);
 
 app.Run();
 
-static async Task CreateDatabaseAsync(IServiceProvider services)
+static async Task MigrateDatabaseAsync(IServiceProvider services)
 {
     await using var scope = services.CreateAsyncScope();
     var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -102,7 +110,7 @@ static async Task CreateDatabaseAsync(IServiceProvider services)
     {
         try
         {
-            await database.Database.EnsureCreatedAsync();
+            await database.Database.MigrateAsync();
             return;
         }
         catch when (attempt < 10)

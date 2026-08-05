@@ -13,7 +13,7 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-home-stock}
       Jwt__Audience: ${JWT_AUDIENCE:-home-stock-clients}
       Jwt__Key: ${JWT_KEY:?set a random JWT_KEY of at least 32 bytes in .env}
-      Database__EnsureCreated: ${DATABASE_ENSURE_CREATED:-true}
+      Database__AutoMigrate: ${DATABASE_AUTO_MIGRATE:-true}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:3000}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
