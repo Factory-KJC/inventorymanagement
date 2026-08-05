@@ -1,5 +1,8 @@
 namespace InventoryAPI.Domain.Shopping;
 
+/// <summary>
+/// 一度の買い物単位で管理するリストです。有効なリストは世帯ごとに1件を想定します。
+/// </summary>
 public sealed class ShoppingList
 {
     public Guid Id { get; set; }

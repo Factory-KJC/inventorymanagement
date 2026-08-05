@@ -7,11 +7,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InventoryAPI.Controllers;
 
+/// <summary>
+/// 監査・確認用の在庫移動履歴を提供します。
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/movements")]
 public sealed class MovementsController(ApplicationDbContext db) : ControllerBase
 {
+    private const int DefaultLimit = 100;
+    private const int MaximumLimit = 500;
+
     /// <summary>
     /// 在庫操作履歴一覧取得
     /// </summary>
@@ -22,10 +28,10 @@ public sealed class MovementsController(ApplicationDbContext db) : ControllerBas
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<StockMovementResponse>>> GetMovements(
         [FromQuery] Guid? productId,
-        [FromQuery] int limit = 100,
+        [FromQuery] int limit = DefaultLimit,
         CancellationToken cancellationToken = default)
     {
-        limit = Math.Clamp(limit, 1, 500);
+        limit = Math.Clamp(limit, 1, MaximumLimit);
         var movements =
             from movement in db.StockMovements.AsNoTracking()
             join operation in db.StockOperations.AsNoTracking() on movement.StockOperationId equals operation.Id

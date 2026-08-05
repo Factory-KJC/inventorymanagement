@@ -1,27 +1,28 @@
+using InventoryAPI.Application.Shopping;
 using InventoryAPI.Contracts.Shopping;
-using InventoryAPI.Data;
-using InventoryAPI.Domain;
-using InventoryAPI.Domain.Shopping;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace InventoryAPI.Controllers;
 
+/// <summary>
+/// 現在有効な買い物リストを操作します。
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/shopping-lists/current")]
-public sealed class ShoppingListsController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
+public sealed class ShoppingListsController(ShoppingListService shoppingListService) : ControllerBase
 {
+    /// <summary>
+    /// 現在の買い物リストを取得します。未作成の場合は空のリストを返します。
+    /// </summary>
     [HttpGet]
-    public async Task<ActionResult<ShoppingListResponse>> GetCurrent(CancellationToken cancellationToken)
-    {
-        var list = await FindCurrentAsync(cancellationToken);
-        return list is null
-            ? Ok(new ShoppingListResponse(null, ShoppingListStatus.Active, null, []))
-            : Ok(ToResponse(list));
-    }
+    public async Task<ActionResult<ShoppingListResponse>> GetCurrent(CancellationToken cancellationToken) =>
+        Ok(await shoppingListService.GetCurrentAsync(cancellationToken));
 
+    /// <summary>
+    /// 買い物リストへ項目を手動追加します。
+    /// </summary>
     [HttpPost("items")]
     public async Task<ActionResult<ShoppingListResponse>> AddItem(
         AddShoppingItemRequest request,
@@ -30,132 +31,47 @@ public sealed class ShoppingListsController(ApplicationDbContext db, TimeProvide
         var name = request.Name.Trim();
         if (name.Length == 0)
             return ValidationProblem("品名は必須です。");
-        if (request.ProductId.HasValue && !await db.Products.AnyAsync(
-                x => x.Id == request.ProductId && x.HouseholdId == SystemDefaults.HouseholdId,
-                cancellationToken))
-            return NotFound(new ProblemDetails { Title = "商品が見つかりません。", Status = 404 });
 
-        var list = await GetOrCreateCurrentAsync(cancellationToken);
-        var now = timeProvider.GetUtcNow();
-        list.Items.Add(new ShoppingListItem
-        {
-            Id = Guid.NewGuid(),
-            ShoppingListId = list.Id,
-            ProductId = request.ProductId,
-            Name = name,
-            Quantity = request.Quantity,
-            Source = ShoppingItemSource.Manual,
-            Status = ShoppingItemStatus.Pending,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await db.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(list));
+        var response = await shoppingListService.AddItemAsync(request, name, cancellationToken);
+        return response is null
+            ? NotFound(new ProblemDetails
+            {
+                Title = "商品が見つかりません。",
+                Status = StatusCodes.Status404NotFound
+            })
+            : Ok(response);
     }
 
+    /// <summary>
+    /// 補充点を下回った商品から買い物候補を作成・更新します。
+    /// </summary>
     [HttpPost("generate")]
-    public async Task<ActionResult<ShoppingListResponse>> Generate(CancellationToken cancellationToken)
-    {
-        var list = await GetOrCreateCurrentAsync(cancellationToken);
-        var stockRows = await db.StockLots.Where(x => x.HouseholdId == SystemDefaults.HouseholdId)
-            .Select(x => new { x.ProductId, x.CurrentQuantity })
-            .ToListAsync(cancellationToken);
-        var stock = stockRows.GroupBy(x => x.ProductId)
-            .ToDictionary(x => x.Key, x => x.Sum(y => y.CurrentQuantity));
-        var products = await db.Products.Where(x =>
-                x.HouseholdId == SystemDefaults.HouseholdId && x.ReorderPoint != null)
-            .ToListAsync(cancellationToken);
-        var now = timeProvider.GetUtcNow();
+    public async Task<ActionResult<ShoppingListResponse>> Generate(CancellationToken cancellationToken) =>
+        Ok(await shoppingListService.GenerateSuggestionsAsync(cancellationToken));
 
-        foreach (var product in products)
-        {
-            var current = stock.GetValueOrDefault(product.Id);
-            if (current >= product.ReorderPoint!.Value)
-                continue;
-
-            var existing = list.Items.FirstOrDefault(x =>
-                x.ProductId == product.Id && x.Source == ShoppingItemSource.ReorderSuggestion);
-            if (existing is { Status: ShoppingItemStatus.Dismissed or ShoppingItemStatus.Purchased })
-                continue;
-
-            var target = product.TargetQuantity ?? product.ReorderPoint.Value;
-            var suggested = Math.Max(target - current, 1);
-            if (existing is null)
-            {
-                list.Items.Add(new ShoppingListItem
-                {
-                    Id = Guid.NewGuid(), ShoppingListId = list.Id, ProductId = product.Id,
-                    Name = product.Name, Quantity = suggested, Source = ShoppingItemSource.ReorderSuggestion,
-                    Status = ShoppingItemStatus.Pending, CreatedAt = now, UpdatedAt = now
-                });
-            }
-            else
-            {
-                existing.Name = product.Name;
-                existing.Quantity = suggested;
-                existing.UpdatedAt = now;
-            }
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(list));
-    }
-
+    /// <summary>
+    /// 買い物項目の数量または状態を更新します。
+    /// </summary>
     [HttpPatch("items/{id:guid}")]
     public async Task<ActionResult<ShoppingListResponse>> UpdateItem(
         Guid id,
         UpdateShoppingItemRequest request,
         CancellationToken cancellationToken)
     {
-        var list = await FindCurrentAsync(cancellationToken);
-        var item = list?.Items.SingleOrDefault(x => x.Id == id);
-        if (list is null || item is null)
-            return NotFound();
         if (!request.Quantity.HasValue && !request.Status.HasValue)
             return ValidationProblem("数量または状態を指定してください。");
 
-        if (request.Quantity.HasValue)
-            item.Quantity = request.Quantity.Value;
-        if (request.Status.HasValue)
-            item.Status = request.Status.Value;
-        item.UpdatedAt = timeProvider.GetUtcNow();
-        await db.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(list));
+        var response = await shoppingListService.UpdateItemAsync(id, request, cancellationToken);
+        return response is null ? NotFound() : Ok(response);
     }
 
+    /// <summary>
+    /// 現在の買い物リストを完了状態にします。
+    /// </summary>
     [HttpPost("complete")]
     public async Task<ActionResult<ShoppingListResponse>> Complete(CancellationToken cancellationToken)
     {
-        var list = await FindCurrentAsync(cancellationToken);
-        if (list is null)
-            return NotFound();
-        list.Status = ShoppingListStatus.Completed;
-        list.CompletedAt = timeProvider.GetUtcNow();
-        await db.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(list));
+        var response = await shoppingListService.CompleteAsync(cancellationToken);
+        return response is null ? NotFound() : Ok(response);
     }
-
-    private async Task<ShoppingList?> FindCurrentAsync(CancellationToken cancellationToken) =>
-        await db.ShoppingLists.Include(x => x.Items).SingleOrDefaultAsync(
-            x => x.HouseholdId == SystemDefaults.HouseholdId && x.Status == ShoppingListStatus.Active,
-            cancellationToken);
-
-    private async Task<ShoppingList> GetOrCreateCurrentAsync(CancellationToken cancellationToken)
-    {
-        var list = await FindCurrentAsync(cancellationToken);
-        if (list is not null)
-            return list;
-        list = new ShoppingList
-        {
-            Id = Guid.NewGuid(), HouseholdId = SystemDefaults.HouseholdId,
-            Status = ShoppingListStatus.Active, CreatedAt = timeProvider.GetUtcNow()
-        };
-        db.ShoppingLists.Add(list);
-        return list;
-    }
-
-    private static ShoppingListResponse ToResponse(ShoppingList list) => new(
-        list.Id, list.Status, list.CreatedAt,
-        list.Items.OrderBy(x => x.Status).ThenBy(x => x.Name).Select(x => new ShoppingItemResponse(
-            x.Id, x.ProductId, x.Name, x.Quantity, x.Source, x.Status)).ToList());
 }

@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InventoryAPI.Controllers;
 
+/// <summary>
+/// 商品マスターの検索と登録を提供します。
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/products")]
@@ -41,7 +44,13 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         }
 
         return await products.OrderBy(x => x.Name)
-            .Select(x => new ProductResponse(x.Id, x.Name, x.Barcode, x.Unit, x.ReorderPoint, x.TargetQuantity))
+            .Select(product => new ProductResponse(
+                product.Id,
+                product.Name,
+                product.Barcode,
+                product.Unit,
+                product.ReorderPoint,
+                product.TargetQuantity))
             .ToListAsync(cancellationToken);
     }
 
@@ -56,7 +65,13 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
     {
         var product = await db.Products.AsNoTracking()
             .Where(x => x.Id == id && x.HouseholdId == SystemDefaults.HouseholdId)
-            .Select(x => new ProductResponse(x.Id, x.Name, x.Barcode, x.Unit, x.ReorderPoint, x.TargetQuantity))
+            .Select(product => new ProductResponse(
+                product.Id,
+                product.Name,
+                product.Barcode,
+                product.Unit,
+                product.ReorderPoint,
+                product.TargetQuantity))
             .SingleOrDefaultAsync(cancellationToken);
         return product is null ? NotFound() : Ok(product);
     }
@@ -80,9 +95,13 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
             return ValidationProblem("商品名と単位は必須です。");
         if (!BarcodeValidator.IsValid(barcode))
             return ValidationProblem("JANコードの形式またはチェックディジットが正しくありません。");
-        if (request.ReorderPoint.HasValue && request.TargetQuantity.HasValue && request.TargetQuantity < request.ReorderPoint)
+        if (request.ReorderPoint.HasValue &&
+            request.TargetQuantity.HasValue &&
+            request.TargetQuantity < request.ReorderPoint)
             return ValidationProblem("目標在庫は補充点以上にしてください。");
-        if (barcode is not null && await db.Products.AnyAsync(x => x.HouseholdId == SystemDefaults.HouseholdId && x.Barcode == barcode, cancellationToken))
+        if (barcode is not null && await db.Products.AnyAsync(
+                product => product.HouseholdId == SystemDefaults.HouseholdId && product.Barcode == barcode,
+                cancellationToken))
             return Conflict(new ProblemDetails { Title = "このJANコードは登録済みです。", Status = StatusCodes.Status409Conflict });
 
         var now = timeProvider.GetUtcNow();
@@ -101,7 +120,14 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
 
-        var response = new ProductResponse(product.Id, product.Name, product.Barcode, product.Unit, product.ReorderPoint, product.TargetQuantity);
-        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, response);
+        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, ToResponse(product));
     }
+
+    private static ProductResponse ToResponse(Product product) => new(
+        product.Id,
+        product.Name,
+        product.Barcode,
+        product.Unit,
+        product.ReorderPoint,
+        product.TargetQuantity);
 }

@@ -7,8 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InventoryAPI.Application.Inventory;
 
+/// <summary>
+/// 在庫の入庫・消費を、操作履歴と整合性を保ちながら実行します。
+/// </summary>
 public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeProvider)
 {
+    /// <summary>
+    /// 同一商品・保管場所・期限のロットへ数量を加算します。
+    /// </summary>
     public async Task<InventoryResult> ReceiveAsync(
         ReceiveStockRequest request,
         string idempotencyKey,
@@ -21,7 +27,10 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
         if (!await ProductAndLocationExistAsync(request.ProductId, request.LocationId, cancellationToken))
             return InventoryResult.NotFound();
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        // ロットの同時作成や数量更新の競合を防ぐため、在庫更新は直列化可能トランザクションで行います。
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
         var now = timeProvider.GetUtcNow();
         var lot = await db.StockLots.SingleOrDefaultAsync(x =>
             x.HouseholdId == SystemDefaults.HouseholdId &&
@@ -68,7 +77,10 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
         if (!await db.Products.AnyAsync(x => x.Id == request.ProductId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken))
             return InventoryResult.NotFound();
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+        // FEFO: 期限ありを先に、さらに期限の近いロットから順に消費します。
         var lots = await db.StockLots
             .Where(x => x.HouseholdId == SystemDefaults.HouseholdId &&
                         x.ProductId == request.ProductId &&
@@ -104,6 +116,9 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
         return InventoryResult.Success(operation);
     }
 
+    /// <summary>
+    /// 同じ冪等キーの完了済み操作を返し、通信再送による二重計上を防ぎます。
+    /// </summary>
     private async Task<StockOperation?> FindOperationAsync(string key, CancellationToken cancellationToken) =>
         await db.StockOperations.Include(x => x.Movements).SingleOrDefaultAsync(
             x => x.HouseholdId == SystemDefaults.HouseholdId && x.IdempotencyKey == key,
@@ -113,15 +128,20 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
         await db.Products.AnyAsync(x => x.Id == productId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken) &&
         await db.Locations.AnyAsync(x => x.Id == locationId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken);
 
-    private static StockOperation CreateOperation(string key, StockMovementType type, decimal quantity, DateTimeOffset now) => new()
-    {
-        Id = Guid.NewGuid(),
-        HouseholdId = SystemDefaults.HouseholdId,
-        IdempotencyKey = key,
-        Type = type,
-        RequestedQuantity = quantity,
-        OccurredAt = now
-    };
+    private static StockOperation CreateOperation(
+        string idempotencyKey,
+        StockMovementType type,
+        decimal quantity,
+        DateTimeOffset now) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            HouseholdId = SystemDefaults.HouseholdId,
+            IdempotencyKey = idempotencyKey,
+            Type = type,
+            RequestedQuantity = quantity,
+            OccurredAt = now
+        };
 
     private static StockMovement CreateMovement(
         StockOperation operation,
@@ -129,15 +149,19 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
         StockMovementType type,
         decimal delta,
         string? note,
-        DateTimeOffset now) => new()
-    {
-        StockOperationId = operation.Id,
-        StockLotId = lot.Id,
-        ProductId = lot.ProductId,
-        LocationId = lot.LocationId,
-        Type = type,
-        QuantityDelta = delta,
-        OccurredAt = now,
-        Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
-    };
+        DateTimeOffset now) =>
+        new()
+        {
+            StockOperationId = operation.Id,
+            StockLotId = lot.Id,
+            ProductId = lot.ProductId,
+            LocationId = lot.LocationId,
+            Type = type,
+            QuantityDelta = delta,
+            OccurredAt = now,
+            Note = NormalizeNote(note)
+        };
+
+    private static string? NormalizeNote(string? note) =>
+        string.IsNullOrWhiteSpace(note) ? null : note.Trim();
 }

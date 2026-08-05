@@ -1,77 +1,34 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.EntityFrameworkCore;
+using InventoryAPI.Application.Auth;
+using InventoryAPI.Contracts.Auth;
 using InventoryAPI.Data;
-using InventoryAPI.Models;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using BCrypt.Net;
-using Microsoft.AspNetCore.Identity.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace InventoryAPI.Controllers;
 
 /// <summary>
 /// 認証コントローラー
 /// </summary>
-[Route("api/auth")]
 [ApiController]
-public class AuthController : ControllerBase
+[Route("api/auth")]
+public sealed class AuthController(ApplicationDbContext db, JwtTokenService tokenService) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _config;
-
-    public AuthController(ApplicationDbContext context, IConfiguration config)
-    {
-        _context = context;
-        _config = config;
-    }
-
     /// <summary>
-    /// ログインエンドポイント（POST /api/auth/login）
+    /// ユーザー名とパスワードを検証し、2時間有効なアクセストークンを発行します。
     /// </summary>
-    /// <param name="request"></param>
-    /// <returns></returns>
     [HttpPost("login")]
-    public IActionResult Login([FromBody] UserLogin request)
+    public async Task<ActionResult<LoginResponse>> Login(
+        LoginRequest request,
+        CancellationToken cancellationToken)
     {
-        var user = _context.Users.SingleOrDefault(u => u.Username == request.Username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password_Hash))
-            return Unauthorized(new { message = "ユーザー名またはパスワードが違います" });
+        var username = request.Username.Trim();
+        var user = await db.Users.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Username == username, cancellationToken);
 
-        var token = GenerateJwtToken(user);
-        return Ok(new { token });
+        // ユーザーの存在有無を応答から推測できないよう、失敗理由は統一します。
+        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            return Unauthorized(new MessageResponse("ユーザー名またはパスワードが違います。"));
+
+        return Ok(new LoginResponse(tokenService.CreateToken(user)));
     }
-
-
-    /// <summary>
-    /// JWTトークンを生成するメソッド
-    /// </summary>
-    /// <param name="user"></param>
-    /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
-    private string GenerateJwtToken(User user)
-    {
-        var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]
-            ?? throw new InvalidOperationException("Jwt:Key is required."));
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, user.Username) }),
-            Expires = DateTime.UtcNow.AddHours(2),
-            Issuer = _config["Jwt:Issuer"],
-            Audience = _config["Jwt:Audience"],
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
-    }
-}
-
-/// <summary>
-/// ユーザーログイン情報のモデル
-/// </summary>
-public class UserLogin
-{
-    public string Username { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
 }

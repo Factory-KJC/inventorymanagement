@@ -1,5 +1,8 @@
 namespace InventoryAPI.Domain.Shopping;
 
+/// <summary>
+/// 手動または在庫不足から追加された買い物項目です。
+/// </summary>
 public sealed class ShoppingListItem
 {
     public Guid Id { get; set; }

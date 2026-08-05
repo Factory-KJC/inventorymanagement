@@ -1,4 +1,3 @@
-using InventoryAPI.Domain;
 using InventoryAPI.Domain.Catalog;
 using InventoryAPI.Domain.Households;
 using InventoryAPI.Domain.Inventory;
@@ -8,6 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InventoryAPI.Data;
 
+/// <summary>
+/// Home Stockが永続化するエンティティへの入口です。
+/// 個別のテーブル設定はData.Configurations名前空間へ分離しています。
+/// </summary>
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
@@ -22,103 +25,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        const string schema = "inventorymanagement";
-
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.ToTable("users", schema);
-            entity.HasIndex(x => x.Username).IsUnique();
-        });
-
-        modelBuilder.Entity<Household>(entity =>
-        {
-            entity.ToTable("households", schema);
-            entity.Property(x => x.Name).HasMaxLength(100);
-            entity.Property(x => x.TimeZone).HasMaxLength(100);
-            entity.HasData(new Household
-            {
-                Id = SystemDefaults.HouseholdId,
-                Name = "自宅",
-                TimeZone = "Asia/Tokyo"
-            });
-        });
-
-        modelBuilder.Entity<Product>(entity =>
-        {
-            entity.ToTable("products", schema);
-            entity.Property(x => x.Name).HasMaxLength(200);
-            entity.Property(x => x.Barcode).HasMaxLength(32);
-            entity.Property(x => x.Unit).HasMaxLength(20);
-            entity.Property(x => x.ReorderPoint).HasPrecision(18, 4);
-            entity.Property(x => x.TargetQuantity).HasPrecision(18, 4);
-            entity.HasIndex(x => new { x.HouseholdId, x.Barcode }).IsUnique();
-            entity.HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Location>(entity =>
-        {
-            entity.ToTable("locations", schema);
-            entity.Property(x => x.Name).HasMaxLength(100);
-            entity.HasIndex(x => new { x.HouseholdId, x.Name }).IsUnique();
-            entity.HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasData(new Location
-            {
-                Id = SystemDefaults.LocationId,
-                HouseholdId = SystemDefaults.HouseholdId,
-                Name = "未設定",
-                SortOrder = 0
-            });
-        });
-
-        modelBuilder.Entity<StockLot>(entity =>
-        {
-            entity.ToTable("stock_lots", schema);
-            entity.Property(x => x.CurrentQuantity).HasPrecision(18, 4);
-            entity.HasIndex(x => new { x.HouseholdId, x.ProductId, x.LocationId, x.ExpiresOn });
-            entity.HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Location>().WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<StockOperation>(entity =>
-        {
-            entity.ToTable("stock_operations", schema);
-            entity.Property(x => x.IdempotencyKey).HasMaxLength(100);
-            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
-            entity.Property(x => x.RequestedQuantity).HasPrecision(18, 4);
-            entity.HasIndex(x => new { x.HouseholdId, x.IdempotencyKey }).IsUnique();
-            entity.HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<StockMovement>(entity =>
-        {
-            entity.ToTable("stock_movements", schema);
-            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
-            entity.Property(x => x.QuantityDelta).HasPrecision(18, 4);
-            entity.Property(x => x.Note).HasMaxLength(500);
-            entity.HasIndex(x => new { x.ProductId, x.OccurredAt });
-            entity.HasOne<StockOperation>().WithMany(x => x.Movements).HasForeignKey(x => x.StockOperationId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne<StockLot>().WithMany().HasForeignKey(x => x.StockLotId).OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<ShoppingList>(entity =>
-        {
-            entity.ToTable("shopping_lists", schema);
-            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
-            entity.HasIndex(x => new { x.HouseholdId, x.Status });
-            entity.HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<ShoppingListItem>(entity =>
-        {
-            entity.ToTable("shopping_list_items", schema);
-            entity.Property(x => x.Name).HasMaxLength(200);
-            entity.Property(x => x.Quantity).HasPrecision(18, 4);
-            entity.Property(x => x.Source).HasConversion<string>().HasMaxLength(30);
-            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
-            entity.HasIndex(x => new { x.ShoppingListId, x.Status });
-            entity.HasOne<ShoppingList>().WithMany(x => x.Items).HasForeignKey(x => x.ShoppingListId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
-        });
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
 }

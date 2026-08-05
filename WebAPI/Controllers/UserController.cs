@@ -1,56 +1,45 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
+using InventoryAPI.Contracts.Auth;
 using InventoryAPI.Data;
 using InventoryAPI.Models;
-using BCrypt.Net;
-using System;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
-namespace InventoryAPI.Controllers
+namespace InventoryAPI.Controllers;
+
+/// <summary>
+/// システムを最初に利用する管理ユーザーを登録します。
+/// </summary>
+[ApiController]
+[Route("api/users")]
+public sealed class UserController(ApplicationDbContext db) : ControllerBase
 {
-    /// <summary>
-    /// ユーザー管理APIのコントローラー
-    /// </summary>
-    [Route("api/users")]
-    [ApiController]
-    public class UserController : ControllerBase
-    {
-        private readonly ApplicationDbContext _context;
-
-        public UserController(ApplicationDbContext context)
-        {
-            _context = context;
-        }
-
-        /// <summary>
-        /// ユーザー登録エンドポイント
-        /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
-        {
-            var username = request.Username.Trim();
-            if (username.Length < 3 || request.Password.Length < 12)
-                return BadRequest(new { message = "ユーザー名は3文字以上、パスワードは12文字以上にしてください。" });
-            if (await _context.Users.AnyAsync(cancellationToken))
-                return Conflict(new { message = "初回ユーザーは登録済みです。追加メンバー機能は現在未実装です。" });
-
-            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
-            var user = new User { Username = username, Password_Hash = hashedPassword };
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            return Ok(new { message = "ユーザー登録に成功しました。" });
-        }
-    }
+    private const int MinimumUsernameLength = 3;
+    private const int MinimumPasswordLength = 12;
 
     /// <summary>
-    /// ユーザー登録リクエストのモデル
+    /// ユーザーがまだ存在しない場合に限り、初回管理ユーザーを登録します。
     /// </summary>
-    public class RegisterRequest
+    [HttpPost("register")]
+    public async Task<ActionResult<MessageResponse>> Register(
+        RegisterUserRequest request,
+        CancellationToken cancellationToken)
     {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
+        var username = request.Username.Trim();
+        if (username.Length < MinimumUsernameLength || request.Password.Length < MinimumPasswordLength)
+            return BadRequest(new MessageResponse("ユーザー名は3文字以上、パスワードは12文字以上にしてください。"));
+
+        // 現段階では単一管理ユーザーのみを許可し、意図しない公開登録を防ぎます。
+        if (await db.Users.AnyAsync(cancellationToken))
+            return Conflict(new MessageResponse("初回ユーザーは登録済みです。追加メンバー機能は現在未実装です。"));
+
+        var user = new User
+        {
+            Username = username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new MessageResponse("ユーザー登録に成功しました。"));
     }
 }
