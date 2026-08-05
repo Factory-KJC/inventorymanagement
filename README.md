@@ -23,6 +23,8 @@
 
 APIはLinuxコンテナとして構築し、Windows開発環境とDebian本番環境で同じイメージを使用します。起動方法は[Docker開発・Debian配備](docs/deployment.md)、APIの現在の機能は[API利用ガイド](docs/api.md)を参照してください。
 
+スマートフォンPWAはAPIのルートURL（開発環境では`http://localhost:8080/`）から配信されます。
+
 ## 構成
 
 ```text

@@ -9,6 +9,8 @@
 - 期限が近いロットからの自動消費（FEFO）
 - 現在庫と入出庫履歴の取得
 - 冪等な入庫・消費
+- 補充点からの買い物リスト提案、手動追加、購入状態更新
+- ダッシュボード集計
 
 Swaggerは開発環境の`/swagger`で確認できます。具体的なリクエストは[InventoryAPI.http](../WebAPI/InventoryAPI.http)にも収録しています。
 
@@ -25,6 +27,16 @@ Idempotency-Key: 381bbbe6-42de-4b27-a51a-bd5b75c95246
 ## JANコード
 
 JANコードは先頭ゼロを保持するため文字列で送ります。8桁または13桁とチェックディジットを検証します。JANコードを持たない商品は`barcode`を省略できます。同一世帯内では一意です。
+
+## ダッシュボード一覧
+
+ダッシュボードの集計値は`GET /api/dashboard`で取得します。集計カードから開く一覧は次のAPIを使用します。
+
+```http
+GET /api/dashboard/{category}?page=1&pageSize=20
+```
+
+`category`には`products`、`low-stock`、`expiring`、`shopping`を指定します。`pageSize`はAPI側で最大20件に制限され、21件目以降は「次へ」で表示します。
 
 ## 消費順
 

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#173f35">
+  <meta name="description" content="自宅の日用品・食料品を管理するHome Stock">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/dashboard.css">
+  <script src="/app.js" defer></script>
+  <title>Home Stock</title>
+</head>
+<body>
+  <main id="login-view" class="login-shell">
+    <section class="login-card">
+      <div class="brand-mark">HS</div>
+      <p class="eyebrow">HOME INVENTORY</p>
+      <h1>Home Stock</h1>
+      <p class="muted">必要なものだけを、必要なときに。</p>
+      <form id="login-form" class="stack">
+        <label>ユーザー名<input id="username" autocomplete="username" required></label>
+        <label>パスワード<input id="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">ログイン</button>
+      </form>
+      <button id="setup-button" class="text-button" type="button">初回ユーザーを登録</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-shell" hidden>
+    <header class="topbar">
+      <div><p class="eyebrow">HOME STOCK</p><h1 id="page-title">ホーム</h1></div>
+      <div class="header-actions"><span id="network-state" class="status-dot">オンライン</span><button id="logout" class="icon-button" aria-label="ログアウト">↪</button></div>
+    </header>
+
+    <main class="content">
+      <section id="home-page" class="page active">
+        <div id="stats" class="stats-grid"></div>
+        <div class="section-heading"><h2>まもなく期限</h2><button data-page="inventory" class="text-button">すべて見る</button></div>
+        <div id="expiring-list" class="card-list"></div>
+        <div class="quick-actions">
+          <button id="quick-receive" class="action-card"><span>＋</span><strong>入庫する</strong></button>
+          <button id="quick-product" class="action-card"><span>▦</span><strong>商品登録</strong></button>
+        </div>
+      </section>
+
+      <section id="inventory-page" class="page">
+        <div class="toolbar"><input id="inventory-search" type="search" placeholder="商品名・JANコードで検索"><button id="open-receive" class="primary compact">入庫</button></div>
+        <div id="inventory-list" class="card-list"></div>
+      </section>
+
+      <section id="shopping-page" class="page">
+        <div class="toolbar"><button id="generate-shopping" class="primary">不足品を提案</button></div>
+        <form id="shopping-form" class="inline-form"><input id="shopping-name" placeholder="買うもの" required><input id="shopping-quantity" type="number" value="1" min="0.0001" step="any" required><button type="submit">追加</button></form>
+        <div id="shopping-list" class="card-list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="メインナビゲーション">
+      <button class="active" data-page="home"><span>⌂</span>ホーム</button>
+      <button data-page="inventory"><span>▤</span>在庫</button>
+      <button data-page="shopping"><span>✓</span>買い物</button>
+    </nav>
+  </div>
+
+  <dialog id="product-dialog">
+    <form id="product-form" class="dialog-card">
+      <header><h2>商品を登録</h2><button type="button" class="close-dialog" aria-label="閉じる">×</button></header>
+      <label>商品名<input id="product-name" required maxlength="200"></label>
+      <label>JANコード<input id="product-barcode" inputmode="numeric" maxlength="13" placeholder="任意"></label>
+      <div class="two-columns"><label>単位<input id="product-unit" value="個" required></label><label>補充点<input id="reorder-point" type="number" min="0" step="any"></label></div>
+      <label>目標在庫<input id="target-quantity" type="number" min="0" step="any"></label>
+      <button class="primary" type="submit">登録する</button>
+    </form>
+  </dialog>
+
+  <dialog id="stock-dialog">
+    <form id="stock-form" class="dialog-card">
+      <header><h2>入庫する</h2><button type="button" class="close-dialog" aria-label="閉じる">×</button></header>
+      <label>商品<select id="stock-product" required></select></label>
+      <div class="two-columns"><label>数量<input id="stock-quantity" type="number" min="0.0001" step="any" value="1" required></label><label>期限<input id="stock-expiry" type="date"></label></div>
+      <label>保管場所<select id="stock-location" required></select></label>
+      <button class="primary" type="submit">入庫する</button>
+    </form>
+  </dialog>
+
+  <dialog id="dashboard-dialog">
+    <section class="dialog-card dashboard-dialog-card">
+      <header><div><p class="eyebrow">DASHBOARD</p><h2 id="dashboard-list-title">一覧</h2></div><button type="button" class="close-dialog" aria-label="閉じる">×</button></header>
+      <div id="dashboard-list" class="card-list"></div>
+      <footer class="pagination"><button id="dashboard-prev" class="small-button">前へ</button><span id="dashboard-page-state"></span><button id="dashboard-next" class="small-button">次へ</button></footer>
+    </section>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

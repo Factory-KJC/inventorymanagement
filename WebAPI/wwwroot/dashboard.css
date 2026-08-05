@@ -1,0 +1,35 @@
+.stat-card {
+  width: 100%;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.stat-card:hover,
+.stat-card:focus-visible {
+  border-color: #79a595;
+  transform: translateY(-1px);
+}
+
+.dashboard-dialog-card {
+  max-height: min(80vh, 700px);
+}
+
+.dashboard-dialog-card .card-list {
+  overflow: auto;
+}
+
+.pagination {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: .82rem;
+  text-align: center;
+}
+
+.pagination button:disabled {
+  cursor: default;
+  opacity: .35;
+}

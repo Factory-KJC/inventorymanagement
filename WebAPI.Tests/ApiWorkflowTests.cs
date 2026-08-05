@@ -6,7 +6,9 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using InventoryAPI.Contracts.Catalog;
+using InventoryAPI.Contracts.Dashboard;
 using InventoryAPI.Contracts.Inventory;
+using InventoryAPI.Contracts.Shopping;
 using InventoryAPI.Data;
 using InventoryAPI.Domain;
 using Microsoft.AspNetCore.Authentication;
@@ -25,10 +27,41 @@ namespace InventoryAPI.Tests;
 public sealed class ApiWorkflowTests
 {
     [Fact]
+    public async Task DashboardList_LimitsEachPageToTwentyItems()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+
+        for (var index = 1; index <= 25; index++)
+        {
+            var response = await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+                $"ページング商品{index:D2}", null, "個", null, null));
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
+
+        var firstPage = await client.GetFromJsonAsync<DashboardListResponse>(
+            "/api/dashboard/products?page=1&pageSize=100");
+        Assert.NotNull(firstPage);
+        Assert.Equal(1, firstPage.Page);
+        Assert.Equal(20, firstPage.PageSize);
+        Assert.Equal(25, firstPage.TotalCount);
+        Assert.Equal(20, firstPage.Items.Count);
+
+        var secondPage = await client.GetFromJsonAsync<DashboardListResponse>(
+            "/api/dashboard/products?page=2&pageSize=20");
+        Assert.NotNull(secondPage);
+        Assert.Equal(2, secondPage.Page);
+        Assert.Equal(5, secondPage.Items.Count);
+    }
+
+    [Fact]
     public async Task RegisterReceiveConsumeAndReadHistory_WorksThroughHttpApi()
     {
         await using var factory = new InventoryApiFactory();
         using var client = factory.CreateClient();
+        var home = await client.GetStringAsync("/");
+        Assert.Contains("<title>Home Stock</title>", home);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
 
         var createProduct = await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
@@ -64,6 +97,20 @@ public sealed class ApiWorkflowTests
         var movements = await client.GetFromJsonAsync<List<StockMovementResponse>>(
             $"/api/movements?productId={product.Id}", jsonOptions);
         Assert.Equal(2, movements!.Count);
+
+        var consumeRest = new HttpRequestMessage(HttpMethod.Post, "/api/inventory/consume")
+        {
+            Content = JsonContent.Create(new ConsumeStockRequest(product.Id, 3, null, "使い切り"))
+        };
+        consumeRest.Headers.Add("Idempotency-Key", "api-consume-002");
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(consumeRest)).StatusCode);
+
+        var generated = await client.PostAsync("/api/shopping-lists/current/generate", null);
+        Assert.Equal(HttpStatusCode.OK, generated.StatusCode);
+        var shoppingList = await generated.Content.ReadFromJsonAsync<ShoppingListResponse>(jsonOptions);
+        var suggested = Assert.Single(shoppingList!.Items);
+        Assert.Equal(product.Id, suggested.ProductId);
+        Assert.Equal(3, suggested.Quantity);
     }
 
     private sealed class InventoryApiFactory : WebApplicationFactory<Program>, IAsyncDisposable

@@ -2,6 +2,7 @@ using InventoryAPI.Domain;
 using InventoryAPI.Domain.Catalog;
 using InventoryAPI.Domain.Households;
 using InventoryAPI.Domain.Inventory;
+using InventoryAPI.Domain.Shopping;
 using InventoryAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<StockLot> StockLots => Set<StockLot>();
     public DbSet<StockOperation> StockOperations => Set<StockOperation>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<ShoppingList> ShoppingLists => Set<ShoppingList>();
+    public DbSet<ShoppingListItem> ShoppingListItems => Set<ShoppingListItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,6 +99,26 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             entity.HasIndex(x => new { x.ProductId, x.OccurredAt });
             entity.HasOne<StockOperation>().WithMany(x => x.Movements).HasForeignKey(x => x.StockOperationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<StockLot>().WithMany().HasForeignKey(x => x.StockLotId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShoppingList>(entity =>
+        {
+            entity.ToTable("shopping_lists", schema);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(x => new { x.HouseholdId, x.Status });
+            entity.HasOne<Household>().WithMany().HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShoppingListItem>(entity =>
+        {
+            entity.ToTable("shopping_list_items", schema);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.Property(x => x.Source).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(x => new { x.ShoppingListId, x.Status });
+            entity.HasOne<ShoppingList>().WithMany(x => x.Items).HasForeignKey(x => x.ShoppingListId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
