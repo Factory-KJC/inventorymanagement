@@ -100,17 +100,41 @@ EPSON TM-T90II TM902UE211は80mm紙・有線LAN（100BASE-TX/10BASE-T）モデ�
 
 ## 8. 配備構成
 
-```text
-外出先スマートフォン
-        │ HTTPS / VPN
-        ▼
-Linux Server
-  Caddy :443
-     └─ ASP.NET Core API :8080
-            ├─ PostgreSQL :5432（内部ネットワークのみ）
-            └─ Print Worker ─ LAN ─ TM902UE211（80mm）
+```mermaid
+flowchart TB
+    Mobile["スマートフォン<br/>PWA"]
 
-自宅Windows PC
-  WPF Client ── HTTPS ── API
-     └─ NSL8BL（USB-HID / 2.4GHz）
+    subgraph Home["家庭内LAN"]
+        direction TB
+
+        subgraph Windows["Windows PC"]
+            WPF["WPF Client<br/>MVVM"]
+            Scanner["NetumScan NSL8BL<br/>USB-HID / 2.4GHz"]
+            Scanner -->|"バーコード入力"| WPF
+        end
+
+        Printer["EPSON TM-T90II<br/>TM902UE211 / 80mm"]
+
+        subgraph Linux["Debian / Docker Compose"]
+            direction TB
+            Caddy["Caddy<br/>TLS終端 :443"]
+            API["ASP.NET Core 8<br/>Web API + PWA配信 :8080"]
+            DB[("PostgreSQL 16<br/>:5432 / 外部非公開")]
+            Worker["Print Worker<br/>ESC/POS印刷キュー<br/>計画中"]
+
+            Caddy -->|"HTTP転送"| API
+            API -->|"EF Core"| DB
+            Worker -.->|"ジョブ取得"| DB
+        end
+
+        WPF -->|"HTTPS / JSON API<br/>JWT認証"| Caddy
+        Worker -.->|"ESC/POS over TCP"| Printer
+    end
+
+    Mobile -->|"HTTPS<br/>インターネットまたはVPN"| Caddy
+
+    classDef planned stroke-dasharray: 5 5
+    class Worker planned
 ```
+
+実線は現在の主要な通信経路、破線は計画中の印刷経路を示します。PostgreSQLとAPIの`8080`番ポートはインターネットへ公開せず、外部からの通信はCaddyの`443`番ポートだけで受け付けます。PWAの静的ファイルはWeb APIから配信されるため、PWA専用コンテナはありません。

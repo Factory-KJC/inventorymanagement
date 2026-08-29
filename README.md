@@ -19,7 +19,7 @@
 3. `StockMovement` — 入庫、消費、廃棄、棚卸、移動の履歴
 4. `ShoppingListItem` — 自動提案と手動追加を統合した買い物項目
 
-全体方針は [プロダクト構想](docs/product-concept.md)、技術構成は [アーキテクチャ](docs/architecture.md)、実装順は [ロードマップ](docs/roadmap.md) を参照してください。
+全体方針は [プロダクト構想](docs/product-concept.md)、技術構成は [アーキテクチャ](docs/architecture.md)、現在地と次作業は [実装状況](docs/implementation-status.md)、実装順は [ロードマップ](docs/roadmap.md) を参照してください。
 
 APIはLinuxコンテナとして構築し、Windows開発環境とDebian本番環境で同じイメージを使用します。起動方法は[Docker開発・Debian配備](docs/deployment.md)、APIの現在の機能は[API利用ガイド](docs/api.md)を参照してください。
 
