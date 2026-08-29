@@ -16,5 +16,6 @@ public sealed class ShoppingList
 public enum ShoppingListStatus
 {
     Active = 1,
-    Completed = 2
+    Completed = 2,
+    Received = 3
 }

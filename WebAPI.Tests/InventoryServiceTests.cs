@@ -59,6 +59,37 @@ public sealed class InventoryServiceTests
         Assert.Equal(1, await fixture.Db.StockOperations.CountAsync());
     }
 
+    [Fact]
+    public async Task Discard_UsesFefoAndRecordsDiscardMovements()
+    {
+        await using var fixture = await InventoryFixture.CreateAsync();
+        await fixture.Service.ReceiveAsync(new(fixture.ProductId, SystemDefaults.LocationId, 2, new DateOnly(2026, 9, 1), null), "receive-early", default);
+        await fixture.Service.ReceiveAsync(new(fixture.ProductId, SystemDefaults.LocationId, 3, null, null), "receive-no-expiry", default);
+
+        var result = await fixture.Service.DiscardAsync(new(fixture.ProductId, 3, null, "破損"), "discard", default);
+
+        Assert.Equal(InventoryResultStatus.Success, result.Status);
+        Assert.All(result.Operation!.Movements, movement => Assert.Equal(StockMovementType.Discard, movement.Type));
+        Assert.Equal(-3, result.Operation.Movements.Sum(x => x.QuantityDelta));
+        Assert.Equal(2, (await fixture.Db.StockLots.ToListAsync()).Sum(x => x.CurrentQuantity));
+    }
+
+    [Fact]
+    public async Task Adjust_SetsLotToCountedQuantityAndRecordsDifference()
+    {
+        await using var fixture = await InventoryFixture.CreateAsync();
+        await fixture.Service.ReceiveAsync(new(fixture.ProductId, SystemDefaults.LocationId, 5, null, null), "receive", default);
+        var lot = await fixture.Db.StockLots.SingleAsync();
+
+        var result = await fixture.Service.AdjustAsync(new(lot.Id, 3, "棚卸"), "adjust", default);
+
+        Assert.Equal(InventoryResultStatus.Success, result.Status);
+        Assert.Equal(3, lot.CurrentQuantity);
+        var movement = Assert.Single(result.Operation!.Movements);
+        Assert.Equal(StockMovementType.Adjust, movement.Type);
+        Assert.Equal(-2, movement.QuantityDelta);
+    }
+
     private sealed class InventoryFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

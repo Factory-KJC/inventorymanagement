@@ -68,35 +68,87 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
     public async Task<InventoryResult> ConsumeAsync(
         ConsumeStockRequest request,
         string idempotencyKey,
+        CancellationToken cancellationToken) =>
+        await RemoveAsync(
+            request.ProductId, request.Quantity, request.LocationId, request.Note,
+            StockMovementType.Consume, idempotencyKey, cancellationToken);
+
+    public async Task<InventoryResult> DiscardAsync(
+        DiscardStockRequest request,
+        string idempotencyKey,
+        CancellationToken cancellationToken) =>
+        await RemoveAsync(
+            request.ProductId, request.Quantity, request.LocationId, request.Note,
+            StockMovementType.Discard, idempotencyKey, cancellationToken);
+
+    public async Task<InventoryResult> AdjustAsync(
+        AdjustStockRequest request,
+        string idempotencyKey,
         CancellationToken cancellationToken)
     {
         var existing = await FindOperationAsync(idempotencyKey, cancellationToken);
         if (existing is not null)
             return InventoryResult.Success(existing);
 
-        if (!await db.Products.AnyAsync(x => x.Id == request.ProductId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken))
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+        var lot = await db.StockLots.SingleOrDefaultAsync(x =>
+            x.Id == request.LotId && x.HouseholdId == SystemDefaults.HouseholdId,
+            cancellationToken);
+        if (lot is null)
+            return InventoryResult.NotFound();
+
+        var now = timeProvider.GetUtcNow();
+        var difference = request.CountedQuantity - lot.CurrentQuantity;
+        lot.CurrentQuantity = request.CountedQuantity;
+        lot.UpdatedAt = now;
+
+        var operation = CreateOperation(idempotencyKey, StockMovementType.Adjust, request.CountedQuantity, now);
+        operation.Movements.Add(CreateMovement(operation, lot, StockMovementType.Adjust, difference, request.Note, now));
+        db.StockOperations.Add(operation);
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return InventoryResult.Success(operation);
+    }
+
+    private async Task<InventoryResult> RemoveAsync(
+        Guid productId,
+        decimal quantity,
+        Guid? locationId,
+        string? note,
+        StockMovementType movementType,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var existing = await FindOperationAsync(idempotencyKey, cancellationToken);
+        if (existing is not null)
+            return InventoryResult.Success(existing);
+
+        if (!await db.Products.AnyAsync(x => x.Id == productId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken))
             return InventoryResult.NotFound();
 
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             cancellationToken);
-        // FEFO: 期限ありを先に、さらに期限の近いロットから順に消費します。
+        // FEFO: 期限ありを先に、さらに期限の近いロットから順に減算します。
         var lots = await db.StockLots
             .Where(x => x.HouseholdId == SystemDefaults.HouseholdId &&
-                        x.ProductId == request.ProductId &&
+                        x.ProductId == productId &&
                         x.CurrentQuantity > 0 &&
-                        (!request.LocationId.HasValue || x.LocationId == request.LocationId.Value))
+                        (!locationId.HasValue || x.LocationId == locationId.Value))
             .OrderBy(x => x.ExpiresOn == null)
             .ThenBy(x => x.ExpiresOn)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
 
-        if (lots.Sum(x => x.CurrentQuantity) < request.Quantity)
+        if (lots.Sum(x => x.CurrentQuantity) < quantity)
             return InventoryResult.InsufficientStock();
 
         var now = timeProvider.GetUtcNow();
-        var operation = CreateOperation(idempotencyKey, StockMovementType.Consume, request.Quantity, now);
-        var remaining = request.Quantity;
+        var operation = CreateOperation(idempotencyKey, movementType, quantity, now);
+        var remaining = quantity;
 
         foreach (var lot in lots)
         {
@@ -107,7 +159,7 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
             lot.CurrentQuantity -= consumed;
             lot.UpdatedAt = now;
             remaining -= consumed;
-            operation.Movements.Add(CreateMovement(operation, lot, StockMovementType.Consume, -consumed, request.Note, now));
+            operation.Movements.Add(CreateMovement(operation, lot, movementType, -consumed, note, now));
         }
 
         db.StockOperations.Add(operation);

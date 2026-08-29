@@ -93,6 +93,30 @@ public sealed class InventoryController(ApplicationDbContext db, InventoryServic
         return MapResult(result);
     }
 
+    [HttpPost("discard")]
+    public async Task<ActionResult<StockOperationResponse>> Discard(
+        DiscardStockRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateIdempotencyKey(idempotencyKey, out var key, out var error))
+            return error!;
+
+        return MapResult(await inventoryService.DiscardAsync(request, key!, cancellationToken));
+    }
+
+    [HttpPost("adjust")]
+    public async Task<ActionResult<StockOperationResponse>> Adjust(
+        AdjustStockRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateIdempotencyKey(idempotencyKey, out var key, out var error))
+            return error!;
+
+        return MapResult(await inventoryService.AdjustAsync(request, key!, cancellationToken));
+    }
+
     /// <summary>
     /// 在庫操作結果をHTTPレスポンスにマッピングする
     /// </summary>

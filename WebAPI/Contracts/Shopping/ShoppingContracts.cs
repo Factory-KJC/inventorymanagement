@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using InventoryAPI.Contracts.Inventory;
 using InventoryAPI.Domain.Shopping;
 
 namespace InventoryAPI.Contracts.Shopping;
@@ -11,6 +12,19 @@ public sealed record AddShoppingItemRequest(
 public sealed record UpdateShoppingItemRequest(
     [Range(typeof(decimal), "0.0001", "999999999")] decimal? Quantity,
     ShoppingItemStatus? Status);
+
+public sealed record ReceiveShoppingListRequest(
+    [Required, MinLength(1)] IReadOnlyList<ReceiveShoppingItemRequest> Items);
+
+public sealed record ReceiveShoppingItemRequest(
+    Guid ItemId,
+    Guid LocationId,
+    DateOnly? ExpiresOn);
+
+public sealed record ReceiveShoppingListResponse(
+    Guid ShoppingListId,
+    ShoppingListStatus Status,
+    StockOperationResponse Operation);
 
 public sealed record ShoppingListResponse(
     Guid? Id,

@@ -19,6 +19,17 @@ public sealed record ConsumeStockRequest(
     Guid? LocationId,
     [StringLength(500)] string? Note);
 
+public sealed record DiscardStockRequest(
+    Guid ProductId,
+    [Range(typeof(decimal), "0.0001", "999999999")] decimal Quantity,
+    Guid? LocationId,
+    [StringLength(500)] string? Note);
+
+public sealed record AdjustStockRequest(
+    Guid LotId,
+    [Range(typeof(decimal), "0", "999999999")] decimal CountedQuantity,
+    [StringLength(500)] string? Note);
+
 public sealed record StockOperationResponse(
     Guid OperationId,
     StockMovementType Type,

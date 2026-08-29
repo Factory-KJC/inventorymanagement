@@ -43,6 +43,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<InventoryService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<ShoppingListService>();
+        services.AddScoped<ShoppingReceiptService>();
         services.AddScoped<JwtTokenService>();
         services.AddSingleton(TimeProvider.System);
 

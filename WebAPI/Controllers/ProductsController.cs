@@ -123,6 +123,72 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, ToResponse(product));
     }
 
+    /// <summary>
+    /// 商品名、JANコード、単位、補充基準を一括で更新します。
+    /// </summary>
+    /// <param name="id">更新対象の商品ID。</param>
+    /// <param name="request">更新後の商品情報。JANコードを解除する場合はnullを指定します。</param>
+    /// <param name="cancellationToken">処理のキャンセル通知。</param>
+    /// <returns>更新後の商品。対象が存在しない場合は404を返します。</returns>
+    [HttpPatch("{id:guid}")]
+    public async Task<ActionResult<ProductResponse>> UpdateProduct(
+        Guid id,
+        UpdateProductRequest request,
+        CancellationToken cancellationToken)
+    {
+        var product = await db.Products.SingleOrDefaultAsync(
+            product => product.Id == id && product.HouseholdId == SystemDefaults.HouseholdId,
+            cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var name = request.Name.Trim();
+        var unit = request.Unit.Trim();
+        var barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
+
+        if (name.Length == 0 || unit.Length == 0)
+        {
+            return ValidationProblem("商品名と単位は必須です。");
+        }
+
+        if (!BarcodeValidator.IsValid(barcode))
+        {
+            return ValidationProblem("JANコードの形式またはチェックディジットが正しくありません。");
+        }
+
+        if (request.ReorderPoint.HasValue &&
+            request.TargetQuantity.HasValue &&
+            request.TargetQuantity < request.ReorderPoint)
+        {
+            return ValidationProblem("目標在庫は補充点以上にしてください。");
+        }
+
+        if (barcode is not null && await db.Products.AnyAsync(
+                other => other.HouseholdId == SystemDefaults.HouseholdId &&
+                         other.Id != id &&
+                         other.Barcode == barcode,
+                cancellationToken))
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "このJANコードは登録済みです。",
+                Status = StatusCodes.Status409Conflict
+            });
+        }
+
+        product.Name = name;
+        product.Barcode = barcode;
+        product.Unit = unit;
+        product.ReorderPoint = request.ReorderPoint;
+        product.TargetQuantity = request.TargetQuantity;
+        product.UpdatedAt = timeProvider.GetUtcNow();
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToResponse(product));
+    }
+
     private static ProductResponse ToResponse(Product product) => new(
         product.Id,
         product.Name,

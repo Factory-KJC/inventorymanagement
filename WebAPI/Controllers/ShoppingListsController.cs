@@ -1,5 +1,6 @@
 using InventoryAPI.Application.Shopping;
 using InventoryAPI.Contracts.Shopping;
+using InventoryAPI.Contracts.Inventory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,9 @@ namespace InventoryAPI.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/shopping-lists/current")]
-public sealed class ShoppingListsController(ShoppingListService shoppingListService) : ControllerBase
+public sealed class ShoppingListsController(
+    ShoppingListService shoppingListService,
+    ShoppingReceiptService shoppingReceiptService) : ControllerBase
 {
     /// <summary>
     /// 現在の買い物リストを取得します。未作成の場合は空のリストを返します。
@@ -73,5 +76,51 @@ public sealed class ShoppingListsController(ShoppingListService shoppingListServ
     {
         var response = await shoppingListService.CompleteAsync(cancellationToken);
         return response is null ? NotFound() : Ok(response);
+    }
+
+    /// <summary>
+    /// 完了したリストの購入済み商品を、指定した保管場所と期限の実在庫へ一括入庫します。
+    /// </summary>
+    [HttpPost("~/api/shopping-lists/{id:guid}/receive")]
+    public async Task<ActionResult<ReceiveShoppingListResponse>> Receive(
+        Guid id,
+        ReceiveShoppingListRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var key = idempotencyKey?.Trim();
+        if (string.IsNullOrEmpty(key) || key.Length > 100)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Idempotency-Keyヘッダーは1〜100文字で指定してください。",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var result = await shoppingReceiptService.ReceiveAsync(id, request, key, cancellationToken);
+        return result.Status switch
+        {
+            ShoppingReceiptResultStatus.Success => Ok(new ReceiveShoppingListResponse(
+                id,
+                Domain.Shopping.ShoppingListStatus.Received,
+                InventoryController.ToResponse(result.Operation!))),
+            ShoppingReceiptResultStatus.NotFound => NotFound(new ProblemDetails
+            {
+                Title = "買い物リストまたは保管場所が見つかりません。",
+                Status = StatusCodes.Status404NotFound
+            }),
+            ShoppingReceiptResultStatus.InvalidState => Conflict(new ProblemDetails
+            {
+                Title = "完了済みの買い物リストだけを入庫できます。",
+                Status = StatusCodes.Status409Conflict
+            }),
+            ShoppingReceiptResultStatus.InvalidItems => BadRequest(new ProblemDetails
+            {
+                Title = "購入済みで商品に紐付く全項目の入庫先を、一度ずつ指定してください。",
+                Status = StatusCodes.Status400BadRequest
+            }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError)
+        };
     }
 }
