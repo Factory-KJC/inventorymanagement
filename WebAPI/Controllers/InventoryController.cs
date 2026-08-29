@@ -118,6 +118,23 @@ public sealed class InventoryController(ApplicationDbContext db, InventoryServic
     }
 
     /// <summary>
+    /// 指定した在庫操作を逆仕訳で取り消します。
+    /// </summary>
+    [HttpPost("operations/{operationId:guid}/reverse")]
+    public async Task<ActionResult<StockOperationResponse>> Reverse(
+        Guid operationId,
+        ReverseStockOperationRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateIdempotencyKey(idempotencyKey, out var key, out var error))
+            return error!;
+
+        return MapResult(await inventoryService.ReverseAsync(
+            operationId, request, key!, cancellationToken));
+    }
+
+    /// <summary>
     /// 在庫操作結果をHTTPレスポンスにマッピングする
     /// </summary>
     /// <param name="result"></param>
@@ -133,6 +150,16 @@ public sealed class InventoryController(ApplicationDbContext db, InventoryServic
         InventoryResultStatus.InsufficientStock => Conflict(new ProblemDetails
         {
             Title = "在庫が不足しています。",
+            Status = StatusCodes.Status409Conflict
+        }),
+        InventoryResultStatus.AlreadyReversed => Conflict(new ProblemDetails
+        {
+            Title = "指定した在庫操作は既に取り消されています。",
+            Status = StatusCodes.Status409Conflict
+        }),
+        InventoryResultStatus.CannotReverse => Conflict(new ProblemDetails
+        {
+            Title = "現在庫との整合性を保てないため、指定した在庫操作を取り消せません。",
             Status = StatusCodes.Status409Conflict
         }),
         _ => StatusCode(StatusCodes.Status500InternalServerError)
@@ -167,6 +194,6 @@ public sealed class InventoryController(ApplicationDbContext db, InventoryServic
         operation.RequestedQuantity,
         operation.OccurredAt,
         operation.Movements.Select(x => new StockMovementResponse(
-            x.Id, x.StockLotId, x.ProductId, x.LocationId, x.Type,
+            x.Id, x.StockLotId, x.ReversesMovementId, x.ProductId, x.LocationId, x.Type,
             x.QuantityDelta, x.OccurredAt, x.Note)).ToList());
 }

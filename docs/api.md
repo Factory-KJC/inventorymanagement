@@ -77,6 +77,12 @@ GET /api/dashboard/{category}?page=1&pageSize=20
 
 廃棄も同じFEFO順で減算し、移動種別を`Discard`として記録します。棚卸調整は在庫一覧で取得した`lotId`と実数の`countedQuantity`を指定し、変更前との差分を`Adjust`として記録します。実数には0も指定できます。
 
+## 在庫操作の取消し
+
+`POST /api/inventory/operations/{operationId}/reverse`へ`Idempotency-Key`ヘッダーと任意の`note`を送ると、指定した操作を逆仕訳で取り消します。元の履歴は変更せず、各移動の数量を反転した`Reverse`履歴を追加し、`reversesMovementId`で元の移動を参照します。
+
+同じ冪等キーでの再送は最初の結果を返します。別の冪等キーで同じ操作を再度取り消した場合、`Reverse`操作自体を指定した場合、または入庫取消しによって現在庫が負になる場合は`409 Conflict`を返し、在庫と履歴は変更しません。
+
 ## エラー
 
 エラーはProblem Details（`application/problem+json`）で返します。
@@ -86,4 +92,4 @@ GET /api/dashboard/{category}?page=1&pageSize=20
 | 400 | 入力またはIdempotency-Keyが不正 |
 | 401 | 未認証またはトークン期限切れ |
 | 404 | 商品または保管場所が存在しない |
-| 409 | JANコード重複、保管場所名重複、在庫不足 |
+| 409 | JANコード重複、保管場所名重複、在庫不足、取消し競合 |

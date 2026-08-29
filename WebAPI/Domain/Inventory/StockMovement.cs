@@ -9,6 +9,7 @@ public sealed class StockMovement
     public long Id { get; set; }
     public Guid StockOperationId { get; set; }
     public Guid StockLotId { get; set; }
+    public long? ReversesMovementId { get; set; }
     public Guid ProductId { get; set; }
     public Guid LocationId { get; set; }
     public StockMovementType Type { get; set; }

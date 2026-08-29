@@ -113,6 +113,75 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
         return InventoryResult.Success(operation);
     }
 
+    /// <summary>
+    /// 指定した在庫操作を、元の履歴を保持した逆仕訳として取り消します。
+    /// </summary>
+    public async Task<InventoryResult> ReverseAsync(
+        Guid operationId,
+        ReverseStockOperationRequest request,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var existing = await FindOperationAsync(idempotencyKey, cancellationToken);
+        if (existing is not null)
+            return InventoryResult.Success(existing);
+
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+        var original = await db.StockOperations
+            .Include(operation => operation.Movements)
+            .SingleOrDefaultAsync(operation =>
+                operation.Id == operationId && operation.HouseholdId == SystemDefaults.HouseholdId,
+                cancellationToken);
+        if (original is null)
+            return InventoryResult.NotFound();
+        if (original.Type == StockMovementType.Reverse)
+            return InventoryResult.CannotReverse();
+
+        var originalMovementIds = original.Movements.Select(movement => movement.Id).ToList();
+        if (await db.StockMovements.AnyAsync(
+                movement => movement.ReversesMovementId.HasValue &&
+                            originalMovementIds.Contains(movement.ReversesMovementId.Value),
+                cancellationToken))
+            return InventoryResult.AlreadyReversed();
+
+        var lotIds = original.Movements.Select(movement => movement.StockLotId).Distinct().ToList();
+        var lots = await db.StockLots
+            .Where(lot => lotIds.Contains(lot.Id) && lot.HouseholdId == SystemDefaults.HouseholdId)
+            .ToDictionaryAsync(lot => lot.Id, cancellationToken);
+        if (lots.Count != lotIds.Count)
+            return InventoryResult.NotFound();
+
+        foreach (var movement in original.Movements)
+        {
+            if (lots[movement.StockLotId].CurrentQuantity - movement.QuantityDelta < 0)
+                return InventoryResult.CannotReverse();
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var operation = CreateOperation(
+            idempotencyKey,
+            StockMovementType.Reverse,
+            original.RequestedQuantity,
+            now);
+        foreach (var movement in original.Movements)
+        {
+            var lot = lots[movement.StockLotId];
+            var delta = -movement.QuantityDelta;
+            lot.CurrentQuantity += delta;
+            lot.UpdatedAt = now;
+            var reversal = CreateMovement(operation, lot, StockMovementType.Reverse, delta, request.Note, now);
+            reversal.ReversesMovementId = movement.Id;
+            operation.Movements.Add(reversal);
+        }
+
+        db.StockOperations.Add(operation);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return InventoryResult.Success(operation);
+    }
+
     private async Task<InventoryResult> RemoveAsync(
         Guid productId,
         decimal quantity,

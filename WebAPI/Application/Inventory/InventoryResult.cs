@@ -10,11 +10,15 @@ public sealed record InventoryResult(InventoryResultStatus Status, StockOperatio
     public static InventoryResult Success(StockOperation operation) => new(InventoryResultStatus.Success, operation);
     public static InventoryResult NotFound() => new(InventoryResultStatus.NotFound);
     public static InventoryResult InsufficientStock() => new(InventoryResultStatus.InsufficientStock);
+    public static InventoryResult AlreadyReversed() => new(InventoryResultStatus.AlreadyReversed);
+    public static InventoryResult CannotReverse() => new(InventoryResultStatus.CannotReverse);
 }
 
 public enum InventoryResultStatus
 {
     Success,
     NotFound,
-    InsufficientStock
+    InsufficientStock,
+    AlreadyReversed,
+    CannotReverse
 }

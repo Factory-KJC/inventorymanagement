@@ -90,6 +90,57 @@ public sealed class InventoryServiceTests
         Assert.Equal(-2, movement.QuantityDelta);
     }
 
+    [Fact]
+    public async Task Reverse_RestoresConsumedLotsAndLinksOriginalMovements()
+    {
+        await using var fixture = await InventoryFixture.CreateAsync();
+        await fixture.Service.ReceiveAsync(new(fixture.ProductId, SystemDefaults.LocationId, 5, null, null), "receive", default);
+        var consumed = await fixture.Service.ConsumeAsync(new(fixture.ProductId, 3, null, null), "consume", default);
+
+        var result = await fixture.Service.ReverseAsync(
+            consumed.Operation!.Id,
+            new ReverseStockOperationRequest("誤操作"),
+            "reverse",
+            default);
+
+        Assert.Equal(InventoryResultStatus.Success, result.Status);
+        Assert.Equal(5, (await fixture.Db.StockLots.SingleAsync()).CurrentQuantity);
+        var reversal = Assert.Single(result.Operation!.Movements);
+        Assert.Equal(StockMovementType.Reverse, reversal.Type);
+        Assert.Equal(3, reversal.QuantityDelta);
+        Assert.Equal(Assert.Single(consumed.Operation.Movements).Id, reversal.ReversesMovementId);
+    }
+
+    [Fact]
+    public async Task Reverse_WhenOperationWasAlreadyReversed_DoesNotChangeStock()
+    {
+        await using var fixture = await InventoryFixture.CreateAsync();
+        var received = await fixture.Service.ReceiveAsync(
+            new(fixture.ProductId, SystemDefaults.LocationId, 5, null, null), "receive", default);
+        await fixture.Service.ReverseAsync(received.Operation!.Id, new(null), "reverse-first", default);
+
+        var result = await fixture.Service.ReverseAsync(received.Operation.Id, new(null), "reverse-second", default);
+
+        Assert.Equal(InventoryResultStatus.AlreadyReversed, result.Status);
+        Assert.Equal(0, (await fixture.Db.StockLots.SingleAsync()).CurrentQuantity);
+        Assert.Equal(2, await fixture.Db.StockOperations.CountAsync());
+    }
+
+    [Fact]
+    public async Task ReverseReceive_WhenSomeStockWasConsumed_DoesNotMakeStockNegative()
+    {
+        await using var fixture = await InventoryFixture.CreateAsync();
+        var received = await fixture.Service.ReceiveAsync(
+            new(fixture.ProductId, SystemDefaults.LocationId, 5, null, null), "receive", default);
+        await fixture.Service.ConsumeAsync(new(fixture.ProductId, 2, null, null), "consume", default);
+
+        var result = await fixture.Service.ReverseAsync(received.Operation!.Id, new(null), "reverse", default);
+
+        Assert.Equal(InventoryResultStatus.CannotReverse, result.Status);
+        Assert.Equal(3, (await fixture.Db.StockLots.SingleAsync()).CurrentQuantity);
+        Assert.Equal(2, await fixture.Db.StockOperations.CountAsync());
+    }
+
     private sealed class InventoryFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

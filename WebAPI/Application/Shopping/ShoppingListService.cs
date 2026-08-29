@@ -27,7 +27,7 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
 
         var list = await GetOrCreateCurrentAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
-        list.Items.Add(new ShoppingListItem
+        var item = new ShoppingListItem
         {
             Id = Guid.NewGuid(),
             ShoppingListId = list.Id,
@@ -38,7 +38,9 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
             Status = ShoppingItemStatus.Pending,
             CreatedAt = now,
             UpdatedAt = now
-        });
+        };
+        list.Items.Add(item);
+        db.ShoppingListItems.Add(item);
 
         await db.SaveChangesAsync(cancellationToken);
         return ToResponse(list);
@@ -70,12 +72,14 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
             var suggestedQuantity = Math.Max(targetQuantity - currentQuantity, 1);
             if (existingSuggestion is null)
             {
-                list.Items.Add(CreateSuggestion(
+                var suggestion = CreateSuggestion(
                     list.Id,
                     product.Id,
                     product.Name,
                     suggestedQuantity,
-                    now));
+                    now);
+                list.Items.Add(suggestion);
+                db.ShoppingListItems.Add(suggestion);
                 continue;
             }
 

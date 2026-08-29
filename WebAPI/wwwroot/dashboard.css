@@ -33,3 +33,40 @@
   cursor: default;
   opacity: .35;
 }
+
+button:focus-visible {
+  outline: 3px solid #f3c96b;
+  outline-offset: 2px;
+}
+
+.small-button,
+.bottom-nav button,
+.icon-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.signout-button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--green);
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+@media (max-width: 380px) {
+  .inline-form {
+    grid-template-columns: 1fr auto;
+  }
+
+  .inline-form input:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .two-columns {
+    grid-template-columns: 1fr;
+  }
+}

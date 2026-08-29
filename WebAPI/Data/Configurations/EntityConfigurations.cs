@@ -127,6 +127,7 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
         entity.Property(movement => movement.QuantityDelta).HasPrecision(18, 4);
         entity.Property(movement => movement.Note).HasMaxLength(500);
         entity.HasIndex(movement => new { movement.ProductId, movement.OccurredAt });
+        entity.HasIndex(movement => movement.ReversesMovementId).IsUnique();
         entity.HasOne<StockOperation>()
             .WithMany(operation => operation.Movements)
             .HasForeignKey(movement => movement.StockOperationId)
@@ -134,6 +135,10 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
         entity.HasOne<StockLot>()
             .WithMany()
             .HasForeignKey(movement => movement.StockLotId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<StockMovement>()
+            .WithMany()
+            .HasForeignKey(movement => movement.ReversesMovementId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

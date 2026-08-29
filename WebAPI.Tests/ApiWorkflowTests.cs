@@ -11,6 +11,7 @@ using InventoryAPI.Contracts.Inventory;
 using InventoryAPI.Contracts.Shopping;
 using InventoryAPI.Data;
 using InventoryAPI.Domain;
+using InventoryAPI.Domain.Inventory;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -108,6 +109,50 @@ public sealed class ApiWorkflowTests
     }
 
     [Fact]
+    public async Task ReverseOperation_WorksThroughHttpApiAndRejectsSecondReversal()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+
+        var createProduct = await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+            "取消商品", null, "個", null, null));
+        var product = await createProduct.Content.ReadFromJsonAsync<ProductResponse>();
+        var location = Assert.Single((await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations"))!);
+        var receiveRequest = new HttpRequestMessage(HttpMethod.Post, "/api/inventory/receive")
+        {
+            Content = JsonContent.Create(new ReceiveStockRequest(product!.Id, location.Id, 5, null, null))
+        };
+        receiveRequest.Headers.Add("Idempotency-Key", "receive-for-reversal");
+        var receiveResponse = await client.SendAsync(receiveRequest);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+        var received = await receiveResponse.Content.ReadFromJsonAsync<StockOperationResponse>(jsonOptions);
+
+        async Task<HttpResponseMessage> ReverseAsync(string idempotencyKey)
+        {
+            var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"/api/inventory/operations/{received!.OperationId}/reverse")
+            {
+                Content = JsonContent.Create(new ReverseStockOperationRequest("登録誤り"))
+            };
+            request.Headers.Add("Idempotency-Key", idempotencyKey);
+            return await client.SendAsync(request);
+        }
+
+        var reverseResponse = await ReverseAsync("reverse-once");
+
+        Assert.Equal(HttpStatusCode.OK, reverseResponse.StatusCode);
+        var reversed = await reverseResponse.Content.ReadFromJsonAsync<StockOperationResponse>(jsonOptions);
+        Assert.Equal(StockMovementType.Reverse, reversed!.Type);
+        Assert.Equal(Assert.Single(received!.Movements).Id, Assert.Single(reversed.Movements).ReversesMovementId);
+        Assert.Empty((await client.GetFromJsonAsync<List<InventoryLotResponse>>(
+            $"/api/inventory?productId={product.Id}"))!);
+        Assert.Equal(HttpStatusCode.Conflict, (await ReverseAsync("reverse-again")).StatusCode);
+    }
+
+    [Fact]
     public async Task DashboardList_LimitsEachPageToTwentyItems()
     {
         await using var factory = new InventoryApiFactory();
@@ -134,6 +179,61 @@ public sealed class ApiWorkflowTests
         Assert.NotNull(secondPage);
         Assert.Equal(2, secondPage.Page);
         Assert.Equal(5, secondPage.Items.Count);
+    }
+
+    [Fact]
+    public async Task AddShoppingItem_WhenActiveListAlreadyExists_InsertsEachNewItem()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+        var firstResponse = await client.PostAsJsonAsync(
+            "/api/shopping-lists/current/items",
+            new AddShoppingItemRequest(null, "牛乳", 1));
+        var secondResponse = await client.PostAsJsonAsync(
+            "/api/shopping-lists/current/items",
+            new AddShoppingItemRequest(null, "卵", 2));
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var shoppingList = await secondResponse.Content.ReadFromJsonAsync<ShoppingListResponse>(jsonOptions);
+        Assert.Equal(2, shoppingList!.Items.Count);
+        Assert.Contains(shoppingList.Items, item => item.Name == "牛乳" && item.Quantity == 1);
+        Assert.Contains(shoppingList.Items, item => item.Name == "卵" && item.Quantity == 2);
+    }
+
+    [Fact]
+    public async Task GenerateShoppingSuggestions_WhenActiveListAlreadyExists_InsertsNewSuggestion()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+        var manualResponse = await client.PostAsJsonAsync(
+            "/api/shopping-lists/current/items",
+            new AddShoppingItemRequest(null, "手動項目", 1));
+        var productResponse = await client.PostAsJsonAsync(
+            "/api/products",
+            new CreateProductRequest("不足商品", null, "個", 1, 3));
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductResponse>();
+
+        var generatedResponse = await client.PostAsync("/api/shopping-lists/current/generate", null);
+
+        Assert.Equal(HttpStatusCode.OK, manualResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, productResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
+        var shoppingList = await generatedResponse.Content.ReadFromJsonAsync<ShoppingListResponse>(jsonOptions);
+        Assert.Equal(2, shoppingList!.Items.Count);
+        Assert.Contains(shoppingList.Items, item => item.Name == "手動項目");
+        Assert.Contains(shoppingList.Items, item =>
+            item.ProductId == product!.Id &&
+            item.Source == Domain.Shopping.ShoppingItemSource.ReorderSuggestion &&
+            item.Quantity == 3);
     }
 
     [Fact]
@@ -258,6 +358,64 @@ public sealed class ApiWorkflowTests
         };
         differentKeyRequest.Headers.Add("Idempotency-Key", "shopping-receive-again");
         Assert.Equal(HttpStatusCode.Conflict, (await client.SendAsync(differentKeyRequest)).StatusCode);
+    }
+
+    [Fact]
+    public async Task PwaAssets_AreServedWithAnInstallableApplicationShell()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+
+        var index = await client.GetStringAsync("/");
+        var manifestResponse = await client.GetAsync("/manifest.webmanifest");
+        var serviceWorker = await client.GetStringAsync("/service-worker.js");
+        var script = await client.GetStringAsync("/app.js");
+        using var manifest = JsonDocument.Parse(await manifestResponse.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, manifestResponse.StatusCode);
+        Assert.Contains("rel=\"manifest\"", index);
+        Assert.Contains("name=\"viewport\"", index);
+        Assert.Equal("/", manifest.RootElement.GetProperty("id").GetString());
+        Assert.Equal("/", manifest.RootElement.GetProperty("start_url").GetString());
+        Assert.Equal("/", manifest.RootElement.GetProperty("scope").GetString());
+        Assert.Equal("standalone", manifest.RootElement.GetProperty("display").GetString());
+        Assert.True(manifest.RootElement.GetProperty("icons").GetArrayLength() >= 2);
+        Assert.Contains("/manifest.webmanifest", serviceWorker);
+        Assert.Contains("url.pathname.startsWith(\"/api/\")", serviceWorker);
+        Assert.Contains("navigator.serviceWorker.register", script);
+    }
+
+    [Fact]
+    public async Task PwaOfflineQueue_PreservesIdempotencyKeyAndAuthenticationFailures()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+
+        var script = await client.GetStringAsync("/app.js");
+
+        Assert.Contains("transaction.objectStore(STORAGE_KEYS.commandStore).put(command)", script);
+        Assert.Contains("headers: { \"Idempotency-Key\": command.id }", script);
+        Assert.Contains("error.status === 401", script);
+        Assert.Contains("await replayQueue();", script);
+        Assert.Contains("await removeQueued(command.id);", script);
+        Assert.Contains("document.visibilityState === \"visible\"", script);
+    }
+
+    [Fact]
+    public async Task PwaSignOut_ClearsAuthenticationAndReturnsToLoginView()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+
+        var index = await client.GetStringAsync("/");
+        var script = await client.GetStringAsync("/app.js");
+
+        Assert.Contains("id=\"logout\"", index);
+        Assert.Contains("type=\"button\">サインアウト</button>", index);
+        Assert.Contains("sessionStorage.removeItem(STORAGE_KEYS.token)", script);
+        Assert.Contains("state.inventory = []", script);
+        Assert.Contains("showApp(false)", script);
+        Assert.Contains("$(\"#logout\").onclick = logout", script);
     }
 
     private sealed class InventoryApiFactory : WebApplicationFactory<Program>, IAsyncDisposable

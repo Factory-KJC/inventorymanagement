@@ -43,7 +43,7 @@ public sealed class MovementsController(ApplicationDbContext db) : ControllerBas
         return await movements.OrderByDescending(x => x.Id)
             .Take(limit)
             .Select(x => new StockMovementResponse(
-                x.Id, x.StockLotId, x.ProductId, x.LocationId, x.Type,
+                x.Id, x.StockLotId, x.ReversesMovementId, x.ProductId, x.LocationId, x.Type,
                 x.QuantityDelta, x.OccurredAt, x.Note))
             .ToListAsync(cancellationToken);
     }

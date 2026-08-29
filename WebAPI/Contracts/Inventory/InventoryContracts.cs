@@ -30,6 +30,9 @@ public sealed record AdjustStockRequest(
     [Range(typeof(decimal), "0", "999999999")] decimal CountedQuantity,
     [StringLength(500)] string? Note);
 
+public sealed record ReverseStockOperationRequest(
+    [StringLength(500)] string? Note);
+
 public sealed record StockOperationResponse(
     Guid OperationId,
     StockMovementType Type,
@@ -40,6 +43,7 @@ public sealed record StockOperationResponse(
 public sealed record StockMovementResponse(
     long Id,
     Guid LotId,
+    long? ReversesMovementId,
     Guid ProductId,
     Guid LocationId,
     StockMovementType Type,

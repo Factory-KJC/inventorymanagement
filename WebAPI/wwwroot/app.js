@@ -35,6 +35,15 @@ const state = {
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 let toastTimer;
+let isReplayingQueue = false;
+
+class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 const escapeHtml = value => String(value ?? "").replace(
   /[&<>'"]/g,
@@ -63,11 +72,14 @@ async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers });
   if (response.status === 401) {
     logout();
-    throw new Error("ログインの有効期限が切れました。");
+    throw new ApiError("ログインの有効期限が切れました。", response.status);
   }
   if (!response.ok) {
     const problem = await response.json().catch(() => ({}));
-    throw new Error(problem.title || problem.message || `通信に失敗しました (${response.status})`);
+    throw new ApiError(
+      problem.title || problem.message || `通信に失敗しました (${response.status})`,
+      response.status
+    );
   }
 
   return response.status === 204 ? null : response.json();
@@ -93,8 +105,17 @@ function showApp(authenticated) {
 
 function logout() {
   state.token = null;
+  state.products = [];
+  state.locations = [];
+  state.inventory = [];
+  state.shopping = null;
+  state.dashboardList = null;
   sessionStorage.removeItem(STORAGE_KEYS.token);
+  $$('dialog[open]').forEach(dialog => dialog.close());
+  $("#password").value = "";
+  $("#login-error").textContent = "";
   showApp(false);
+  $("#username").focus();
 }
 
 async function refreshAll() {
@@ -306,7 +327,7 @@ async function sendStockCommand(path, body) {
     toast("在庫を更新しました");
     await refreshAll();
   } catch (error) {
-    if (!navigator.onLine || error instanceof TypeError) {
+    if (!navigator.onLine || error instanceof TypeError || error.status === 401) {
       await enqueue(command);
       toast("オフラインのため再送待ちに保存しました");
       await updateNetwork();
@@ -342,6 +363,7 @@ async function handleLogin(event) {
     state.token = result.token;
     sessionStorage.setItem(STORAGE_KEYS.token, state.token);
     showApp(true);
+    await replayQueue();
   } catch (error) {
     $("#login-error").textContent = error.message;
   }
@@ -493,30 +515,37 @@ function transactionCompleted(transaction) {
 }
 
 async function replayQueue() {
-  if (!state.token || !navigator.onLine) {
+  if (!state.token || !navigator.onLine || isReplayingQueue) {
     return;
   }
 
-  for (const command of await queuedCommands()) {
-    try {
-      await api(command.path, {
-        method: "POST",
-        headers: { "Idempotency-Key": command.id },
-        body: JSON.stringify(command.body)
-      });
-      await removeQueued(command.id);
-    } catch (error) {
-      if (error instanceof TypeError) {
-        break;
-      }
+  isReplayingQueue = true;
+  try {
+    for (const command of await queuedCommands()) {
+      try {
+        await api(command.path, {
+          method: "POST",
+          headers: { "Idempotency-Key": command.id },
+          body: JSON.stringify(command.body)
+        });
+        await removeQueued(command.id);
+      } catch (error) {
+        if (error instanceof TypeError || error.status === 401) {
+          break;
+        }
 
-      // 4xxなど再送しても成功しない操作はキューを詰まらせないため破棄します。
-      await removeQueued(command.id);
-      toast(`再送できない操作を破棄しました: ${error.message}`);
+        // 冪等キーの競合や不正入力など、再送しても成功しない操作だけを破棄します。
+        await removeQueued(command.id);
+        toast(`再送できない操作を破棄しました: ${error.message}`);
+      }
     }
+  } finally {
+    isReplayingQueue = false;
   }
 
-  await refreshAll();
+  if (state.token) {
+    await refreshAll();
+  }
   await updateNetwork();
 }
 
@@ -564,6 +593,12 @@ function bindEvents() {
     replayQueue();
   });
   window.addEventListener("offline", updateNetwork);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      updateNetwork();
+      replayQueue();
+    }
+  });
 }
 
 function initialize() {
