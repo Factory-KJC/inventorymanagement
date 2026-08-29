@@ -39,3 +39,22 @@ public sealed record ShoppingItemResponse(
     decimal Quantity,
     ShoppingItemSource Source,
     ShoppingItemStatus Status);
+
+/// <summary>
+/// 現在の買い物リストを印刷レイアウトへ渡すための、表示に依存しないデータを表します。
+/// </summary>
+public sealed record ShoppingListPrintResponse(
+    Guid ShoppingListId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset GeneratedAt,
+    IReadOnlyList<ShoppingListPrintItemResponse> Items);
+
+/// <summary>
+/// 印刷対象となる未購入の買い物項目を表します。
+/// </summary>
+public sealed record ShoppingListPrintItemResponse(
+    Guid ItemId,
+    string Name,
+    decimal Quantity,
+    string? Unit,
+    ShoppingItemSource Source);

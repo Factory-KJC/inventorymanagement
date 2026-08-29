@@ -130,3 +130,7 @@ Content-Type: application/json
     }
   ]
 }
+
+### 現在の買い物リストの印刷用データ
+GET {{host}}/api/shopping-lists/current/print
+Authorization: Bearer {{token}}

@@ -12,6 +12,7 @@
 - 冪等な入庫・消費・廃棄・棚卸調整
 - 補充点からの買い物リスト提案、手動追加、購入状態更新
 - 完了した買い物リストの購入済み商品を実在庫へ一括入庫
+- 買い物リストの印刷用データ取得
 - ダッシュボード集計
 
 Swaggerは開発環境の`/swagger`で確認できます。具体的なリクエストは[InventoryAPI.http](../WebAPI/InventoryAPI.http)にも収録しています。
@@ -56,6 +57,29 @@ Content-Type: application/json
 変換されません。変換全体を一つのトランザクションと入庫操作として記録し、成功後のリストは
 `Received`になります。同じ`Idempotency-Key`の再送は二重計上せず、別のキーによる再変換は
 `409 Conflict`になります。
+
+## 買い物リストの印刷用データ
+
+`GET /api/shopping-lists/current/print`は、現在有効な買い物リストから未購入の項目だけを返します。購入済み・却下済みの項目は含まれません。商品に紐付く項目には商品マスターの単位が入り、自由入力項目の`unit`は`null`になります。リストがまだ作成されていない場合は`404 Not Found`を返します。
+
+```json
+{
+  "shoppingListId": "買い物リストのID",
+  "createdAt": "2026-08-29T00:00:00+00:00",
+  "generatedAt": "2026-08-29T01:00:00+00:00",
+  "items": [
+    {
+      "itemId": "買い物項目のID",
+      "name": "洗剤",
+      "quantity": 2,
+      "unit": "本",
+      "source": "ReorderSuggestion"
+    }
+  ]
+}
+```
+
+`generatedAt`は印刷用データを取得したUTC時刻です。APIは用紙幅やフォントなどのレイアウトを持たず、WPFや将来のPrint Workerがこのデータを58mm・80mm等の出力形式へ整形します。
 
 ## JANコード
 

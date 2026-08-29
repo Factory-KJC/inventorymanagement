@@ -33,7 +33,6 @@ public sealed class ApiWorkflowTests
         await using var factory = new InventoryApiFactory();
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
-
         var firstResponse = await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
             "更新前", "4901234567894", "個", 1, 3));
         var first = await firstResponse.Content.ReadFromJsonAsync<ProductResponse>();
@@ -203,6 +202,45 @@ public sealed class ApiWorkflowTests
         Assert.Equal(2, shoppingList!.Items.Count);
         Assert.Contains(shoppingList.Items, item => item.Name == "牛乳" && item.Quantity == 1);
         Assert.Contains(shoppingList.Items, item => item.Name == "卵" && item.Quantity == 2);
+    }
+
+    [Fact]
+    public async Task GetShoppingListPrintData_ReturnsOnlyPendingItemsWithProductUnits()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+        var productResponse = await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+            "洗剤", null, "本", null, null));
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductResponse>();
+        var firstResponse = await client.PostAsJsonAsync(
+            "/api/shopping-lists/current/items",
+            new AddShoppingItemRequest(product!.Id, product.Name, 2));
+        var firstList = await firstResponse.Content.ReadFromJsonAsync<ShoppingListResponse>(jsonOptions);
+        var productItem = Assert.Single(firstList!.Items);
+        var secondResponse = await client.PostAsJsonAsync(
+            "/api/shopping-lists/current/items",
+            new AddShoppingItemRequest(null, "メモ用品", 1));
+        var secondList = await secondResponse.Content.ReadFromJsonAsync<ShoppingListResponse>(jsonOptions);
+        var manualItem = Assert.Single(secondList!.Items, item => item.ProductId is null);
+        await client.PatchAsJsonAsync(
+            $"/api/shopping-lists/current/items/{manualItem.Id}",
+            new UpdateShoppingItemRequest(null, Domain.Shopping.ShoppingItemStatus.Purchased));
+
+        var response = await client.GetAsync("/api/shopping-lists/current/print");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var printData = await response.Content.ReadFromJsonAsync<ShoppingListPrintResponse>(jsonOptions);
+        Assert.NotNull(printData);
+        Assert.Equal(firstList.Id, printData.ShoppingListId);
+        var printItem = Assert.Single(printData.Items);
+        Assert.Equal(productItem.Id, printItem.ItemId);
+        Assert.Equal("洗剤", printItem.Name);
+        Assert.Equal(2, printItem.Quantity);
+        Assert.Equal("本", printItem.Unit);
     }
 
     [Fact]

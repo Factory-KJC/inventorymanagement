@@ -24,6 +24,22 @@ public sealed class ShoppingListsController(
         Ok(await shoppingListService.GetCurrentAsync(cancellationToken));
 
     /// <summary>
+    /// 現在の買い物リストから未購入項目の印刷用データを取得します。
+    /// </summary>
+    [HttpGet("print")]
+    public async Task<ActionResult<ShoppingListPrintResponse>> GetPrintData(CancellationToken cancellationToken)
+    {
+        var response = await shoppingListService.GetPrintDataAsync(cancellationToken);
+        return response is null
+            ? NotFound(new ProblemDetails
+            {
+                Title = "印刷できる買い物リストが見つかりません。",
+                Status = StatusCodes.Status404NotFound
+            })
+            : Ok(response);
+    }
+
+    /// <summary>
     /// 買い物リストへ項目を手動追加します。
     /// </summary>
     [HttpPost("items")]

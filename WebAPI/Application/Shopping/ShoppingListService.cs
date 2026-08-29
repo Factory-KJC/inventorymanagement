@@ -17,6 +17,43 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
         return list is null ? EmptyResponse() : ToResponse(list);
     }
 
+    /// <summary>
+    /// 現在有効なリストから未購入の項目だけを抽出し、印刷用データを作成します。
+    /// </summary>
+    public async Task<ShoppingListPrintResponse?> GetPrintDataAsync(CancellationToken cancellationToken)
+    {
+        var list = await FindCurrentAsync(cancellationToken);
+        if (list is null)
+            return null;
+
+        var productIds = list.Items
+            .Where(item => item.Status == ShoppingItemStatus.Pending && item.ProductId.HasValue)
+            .Select(item => item.ProductId!.Value)
+            .Distinct()
+            .ToList();
+        var unitsByProductId = await db.Products.AsNoTracking()
+            .Where(product => productIds.Contains(product.Id) &&
+                              product.HouseholdId == SystemDefaults.HouseholdId)
+            .ToDictionaryAsync(product => product.Id, product => product.Unit, cancellationToken);
+        var items = list.Items
+            .Where(item => item.Status == ShoppingItemStatus.Pending)
+            .OrderBy(item => item.Name)
+            .ThenBy(item => item.Id)
+            .Select(item => new ShoppingListPrintItemResponse(
+                item.Id,
+                item.Name,
+                item.Quantity,
+                item.ProductId.HasValue ? unitsByProductId.GetValueOrDefault(item.ProductId.Value) : null,
+                item.Source))
+            .ToList();
+
+        return new ShoppingListPrintResponse(
+            list.Id,
+            list.CreatedAt,
+            timeProvider.GetUtcNow(),
+            items);
+    }
+
     public async Task<ShoppingListResponse?> AddItemAsync(
         AddShoppingItemRequest request,
         string normalizedName,
