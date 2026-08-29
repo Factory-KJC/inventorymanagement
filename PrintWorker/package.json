@@ -1,0 +1,13 @@
+{
+  "name": "home-stock-print-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/worker.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "receiptline": "4.0.4"
+  }
+}

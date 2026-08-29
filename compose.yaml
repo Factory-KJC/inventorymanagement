@@ -16,6 +16,7 @@ services:
       Setup__Token: ${SETUP_TOKEN:?set a one-time SETUP_TOKEN in .env}
       Database__AutoMigrate: ${DATABASE_AUTO_MIGRATE:-true}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:3000}
+      PrintWorker__ApiKey: ${PRINT_WORKER_API_KEY:-}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     depends_on:
@@ -27,6 +28,27 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks: [backend, edge]
+
+  print-worker:
+    profiles: [printing]
+    build:
+      context: PrintWorker
+    image: home-stock-print-worker:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      PRINT_API_URL: http://api:8080
+      PRINT_WORKER_API_KEY: ${PRINT_WORKER_API_KEY:?set a random PRINT_WORKER_API_KEY in .env}
+      PRINTER_HOST: ${PRINTER_HOST:?set the printer LAN address in .env}
+      PRINTER_PORT: ${PRINTER_PORT:-9100}
+    depends_on:
+      api:
+        condition: service_healthy
     logging:
       driver: json-file
       options:

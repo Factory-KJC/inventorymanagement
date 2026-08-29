@@ -2,6 +2,7 @@ using InventoryAPI.Domain;
 using InventoryAPI.Domain.Catalog;
 using InventoryAPI.Domain.Households;
 using InventoryAPI.Domain.Inventory;
+using InventoryAPI.Domain.Printing;
 using InventoryAPI.Domain.Shopping;
 using InventoryAPI.Models;
 using Microsoft.EntityFrameworkCore;
@@ -189,5 +190,20 @@ internal sealed class ShoppingListItemConfiguration : IEntityTypeConfiguration<S
             .WithMany()
             .HasForeignKey(item => item.ProductId)
             .OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+internal sealed class PrintJobConfiguration : IEntityTypeConfiguration<PrintJob>
+{
+    public void Configure(EntityTypeBuilder<PrintJob> entity)
+    {
+        entity.ToTable("print_jobs", DatabaseSchema.Inventory);
+        entity.Property(job => job.PaperWidth).HasConversion<int>();
+        entity.Property(job => job.Status).HasConversion<string>().HasMaxLength(20);
+        entity.Property(job => job.ReceiptLine).HasMaxLength(20000);
+        entity.Property(job => job.LastError).HasMaxLength(1000);
+        entity.HasIndex(job => new { job.Status, job.CreatedAt });
+        entity.HasOne<Household>().WithMany().HasForeignKey(job => job.HouseholdId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ShoppingList>().WithMany().HasForeignKey(job => job.ShoppingListId).OnDelete(DeleteBehavior.Restrict);
     }
 }

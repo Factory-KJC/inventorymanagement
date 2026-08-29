@@ -1,6 +1,7 @@
 using InventoryAPI.Domain.Catalog;
 using InventoryAPI.Domain.Households;
 using InventoryAPI.Domain.Inventory;
+using InventoryAPI.Domain.Printing;
 using InventoryAPI.Domain.Shopping;
 using InventoryAPI.Models;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<ShoppingList> ShoppingLists => Set<ShoppingList>();
     public DbSet<ShoppingListItem> ShoppingListItems => Set<ShoppingListItem>();
+    public DbSet<PrintJob> PrintJobs => Set<PrintJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

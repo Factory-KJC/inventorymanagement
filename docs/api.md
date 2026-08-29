@@ -100,6 +100,16 @@ Content-Type: application/json
 
 `generatedAt`は印刷用データを取得したUTC時刻です。APIは用紙幅やフォントなどのレイアウトを持たず、Windowsクライアントや将来のPrint Workerがこのデータを58mm・80mm等の出力形式へ整形します。
 
+## 印刷ジョブ
+
+`POST /api/shopping-lists/current/print-jobs`へ`{"paperWidth":"Mm80"}`（または`Mm58`）を送ると、未購入項目をreceiptline文書へ整形した不変のスナップショットを作成し、`202 Accepted`を返します。
+
+`GET /api/print-jobs/{id}`で`Pending`、`Processing`、`Succeeded`、`Failed`の状態、試行回数、直近のエラーを確認できます。`POST /api/print-jobs/{id}/retry`は保存済みreceiptline文書を変更せずに再度キューへ入れるため、買い物リストが後から変わっても同じ内容を再印刷します。プリンタへの送信試行はジョブごとに最大3回で、上限到達後の再印刷要求には`409 Conflict`を返します。
+
+Print Worker用エンドポイントは`X-Print-Worker-Key`で保護されます。Workerはreceiptlineの`command: 'escpos'`、`encoding: 'shiftjis'`、`asImage: false`を使い、生成されたESC/POSバイト列をプリンタのTCP 9100番へ直接送信します。画像データへの変換は行いません。
+
+Workerは印刷直前に`receiptline-preview`イベントとして、ジョブID、用紙幅、receiptline文書をJSONログへ出力します。この文書は外部のReceiptLine Designerへ貼り付けてプレビューできます。ESC/POSバイナリはログへ記録しません。
+
 ## JANコード
 
 JANコードは先頭ゼロを保持するため文字列で送ります。8桁または13桁とチェックディジットを検証します。JANコードを持たない商品は`barcode`を省略できます。同一世帯内では一意です。

@@ -94,7 +94,7 @@ GET    /api/shopping-lists/current/print
 
 NetumScan NSL8BLはWindows端末へ2.4GHzレシーバーまたはUSBで接続し、HIDキーボードモードで使用します。読み取り終端をEnterに設定し、WinUI 3側は短時間に入力された文字列と終端キーを1スキャンとして扱います。Bluetoothは予備の接続手段とします。
 
-EPSON TM-T90II TM902UE211は80mm紙・有線LAN（100BASE-TX/10BASE-T）モデルです。家庭内LANへ接続してDHCP予約でアドレスを固定し、Linux上のPrint Workerからネットワーク経由で印刷します。`IReceiptPrinter`境界の背後にESC/POS送信を実装し、開発用のPDF/テキスト出力と実機出力を差し替え可能にします。
+EPSON TM-T90II TM902UE211は80mm紙・有線LAN（100BASE-TX/10BASE-T）モデルです。家庭内LANへ接続してDHCP予約でアドレスを固定し、Linux上のPrint Workerからネットワーク経由で印刷します。レイアウトはreceiptline文書として保存し、Workerがプリンタフォントを使うESC/POSバイト列へ変換してTCP送信します。プリンタへ画像として渡す経路は設けません。
 
 印刷要求はDBの印刷ジョブへ保存してから処理します。プリンタの電源断、紙切れ、通信断は在庫処理へ影響させず、失敗ジョブを再実行できるようにします。プリンタは家庭内LANからだけ到達可能にし、インターネットへポートを公開しません。WindowsクライアントはAPIへ印刷を依頼し、プリンタへ直接接続しません。
 

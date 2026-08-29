@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using InventoryAPI.Application.Auth;
 using InventoryAPI.Application.Dashboard;
 using InventoryAPI.Application.Inventory;
+using InventoryAPI.Application.Printing;
 using InventoryAPI.Application.Shopping;
 using InventoryAPI.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -66,6 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DashboardService>();
         services.AddScoped<ShoppingListService>();
         services.AddScoped<ShoppingReceiptService>();
+        services.AddScoped<PrintJobService>();
         services.AddScoped<JwtTokenService>();
         services.AddSingleton(TimeProvider.System);
 
