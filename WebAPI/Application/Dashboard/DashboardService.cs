@@ -18,11 +18,11 @@ public sealed class DashboardService(ApplicationDbContext db, TimeProvider timeP
     public async Task<DashboardResponse> GetSummaryAsync(CancellationToken cancellationToken)
     {
         var productCount = await db.Products.CountAsync(
-            product => product.HouseholdId == SystemDefaults.HouseholdId,
+            product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted,
             cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);
         var reorderProducts = await db.Products.AsNoTracking()
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && product.ReorderPoint != null)
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted && product.ReorderPoint != null)
             .Select(product => new { product.Id, ReorderPoint = product.ReorderPoint!.Value })
             .ToListAsync(cancellationToken);
         var lowStockCount = reorderProducts.Count(
@@ -79,7 +79,7 @@ public sealed class DashboardService(ApplicationDbContext db, TimeProvider timeP
     private async Task<List<DashboardItemResponse>> GetProductsAsync(CancellationToken cancellationToken)
     {
         var products = await db.Products.AsNoTracking()
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId)
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted)
             .OrderBy(product => product.Name)
             .ToListAsync(cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);
@@ -94,7 +94,7 @@ public sealed class DashboardService(ApplicationDbContext db, TimeProvider timeP
     private async Task<List<DashboardItemResponse>> GetLowStockAsync(CancellationToken cancellationToken)
     {
         var products = await db.Products.AsNoTracking()
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && product.ReorderPoint != null)
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted && product.ReorderPoint != null)
             .OrderBy(product => product.Name)
             .ToListAsync(cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);

@@ -28,6 +28,58 @@ namespace InventoryAPI.Tests;
 public sealed class ApiWorkflowTests
 {
     [Fact]
+    public async Task SoftDelete_SuggestsAndRestoresProductAndLocation()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var product = await (await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+            "キッチン洗剤", null, "本", 1, 2))).Content.ReadFromJsonAsync<ProductResponse>();
+        var location = await (await client.PostAsJsonAsync("/api/locations", new CreateLocationRequest(
+            "キッチン収納", 10))).Content.ReadFromJsonAsync<LocationResponse>();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/products/{product!.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/locations/{location!.Id}")).StatusCode);
+        Assert.DoesNotContain((await client.GetFromJsonAsync<List<ProductResponse>>("/api/products"))!, item => item.Id == product.Id);
+        Assert.DoesNotContain((await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations"))!, item => item.Id == location.Id);
+
+        var productSuggestions = await client.GetFromJsonAsync<List<DeletedProductSuggestionResponse>>(
+            "/api/products/deleted-suggestions?name=浴室洗剤");
+        var locationSuggestions = await client.GetFromJsonAsync<List<DeletedLocationSuggestionResponse>>(
+            "/api/locations/deleted-suggestions?name=キッチン");
+
+        Assert.Equal(product.Id, Assert.Single(productSuggestions!).Id);
+        Assert.Equal(location.Id, Assert.Single(locationSuggestions!).Id);
+        var restoredProduct = await (await client.PostAsJsonAsync(
+            $"/api/products/{product.Id}/restore",
+            new UpdateProductRequest("台所洗剤", null, "本", 2, 3))).Content.ReadFromJsonAsync<ProductResponse>();
+        var restoredLocation = await (await client.PostAsJsonAsync(
+            $"/api/locations/{location.Id}/restore",
+            new UpdateLocationRequest("台所収納", 20))).Content.ReadFromJsonAsync<LocationResponse>();
+        Assert.Equal("台所洗剤", restoredProduct!.Name);
+        Assert.Equal("台所収納", restoredLocation!.Name);
+    }
+
+    [Fact]
+    public async Task UpdateLocation_UpdatesNameAndSortOrder()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var location = Assert.Single((await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations"))!);
+
+        var updateResponse = await client.PatchAsJsonAsync(
+            $"/api/locations/{location.Id}",
+            new UpdateLocationRequest(" 食品庫 ", 25));
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<LocationResponse>();
+        Assert.NotNull(updated);
+        Assert.Equal("食品庫", updated.Name);
+        Assert.Equal(25, updated.SortOrder);
+    }
+
+    [Fact]
     public async Task UpdateProduct_UpdatesFieldsAndRejectsDuplicateBarcode()
     {
         await using var factory = new InventoryApiFactory();

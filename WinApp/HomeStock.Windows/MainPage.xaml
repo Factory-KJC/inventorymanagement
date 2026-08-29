@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="HomeStock.Windows.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+  <Grid Padding="16" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="10">
+    <Border Grid.Row="0" Padding="12" StrokeShape="RoundRectangle 8">
+      <Grid ColumnDefinitions="Auto,150,Auto,180,Auto,140,Auto,140,Auto" ColumnSpacing="8">
+        <Label Text="API" VerticalOptions="Center" />
+        <Entry Grid.Column="1" Text="{Binding ApiUrl}" />
+        <Label Grid.Column="2" Text="ユーザー" VerticalOptions="Center" />
+        <Entry Grid.Column="3" Text="{Binding Username}" />
+        <Label Grid.Column="4" Text="パスワード" VerticalOptions="Center" />
+        <Entry Grid.Column="5" IsPassword="True" Text="{Binding Password}" />
+        <Label Grid.Column="6" Text="初回設定トークン" VerticalOptions="Center" />
+        <Entry Grid.Column="7" IsPassword="True" Text="{Binding SetupToken}" />
+        <HorizontalStackLayout Grid.Column="8" Spacing="6">
+          <Button Command="{Binding LoginCommand}" Text="ログイン" />
+          <Button Command="{Binding RegisterCommand}" Text="初回登録" />
+          <Button Command="{Binding LogoutCommand}" Text="ログアウト" />
+        </HorizontalStackLayout>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Padding="12" StrokeShape="RoundRectangle 8" IsEnabled="{Binding IsAuthenticated}">
+      <HorizontalStackLayout Spacing="8">
+        <Label Text="連続スキャン入庫" FontAttributes="Bold" VerticalOptions="Center" />
+        <Label Text="保管場所" VerticalOptions="Center" />
+        <Picker WidthRequest="180" ItemsSource="{Binding Locations}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedScanLocation}" />
+        <Label Text="疑似JAN" VerticalOptions="Center" />
+        <Entry WidthRequest="160" MaxLength="13" Keyboard="Numeric" Text="{Binding SimulatedBarcode}" />
+        <Button Command="{Binding SimulateScanCommand}" Text="疑似スキャン" />
+        <Label Style="{StaticResource MutedLabel}" Text="実機はUSB-HIDでJAN入力後Enter。画面内のどこにフォーカスがあっても受け付けます。" VerticalOptions="Center" />
+      </HorizontalStackLayout>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,*" ColumnSpacing="10" IsEnabled="{Binding IsAuthenticated}">
+      <Label Text="表示" VerticalOptions="Center" />
+      <Picker Grid.Column="1" WidthRequest="260" HorizontalOptions="Start" ItemsSource="{Binding Sections}" SelectedIndex="{Binding SelectedSectionIndex}" />
+    </Grid>
+
+    <Grid Grid.Row="3" IsEnabled="{Binding IsAuthenticated}">
+      <VerticalStackLayout IsVisible="{Binding IsSection0Visible}" Spacing="10">
+        <Label Style="{StaticResource SectionTitle}" Text="ホーム" />
+        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+          <Border Padding="18"><VerticalStackLayout><Label Text="登録商品" HorizontalTextAlignment="Center" /><Label Text="{Binding ProductCount}" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" /></VerticalStackLayout></Border>
+          <Border Grid.Column="1" Padding="18"><VerticalStackLayout><Label Text="在庫不足" HorizontalTextAlignment="Center" /><Label Text="{Binding LowStockCount}" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" /></VerticalStackLayout></Border>
+          <Border Grid.Column="2" Padding="18"><VerticalStackLayout><Label Text="7日以内期限" HorizontalTextAlignment="Center" /><Label Text="{Binding ExpiringCount}" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" /></VerticalStackLayout></Border>
+          <Border Grid.Column="3" Padding="18"><VerticalStackLayout><Label Text="買うもの" HorizontalTextAlignment="Center" /><Label Text="{Binding ShoppingCount}" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" /></VerticalStackLayout></Border>
+        </Grid>
+        <Label Text="まもなく期限" FontAttributes="Bold" />
+        <CollectionView ItemsSource="{Binding ExpiringInventory}" SelectionMode="None" VerticalOptions="FillAndExpand">
+          <CollectionView.Header><Grid Style="{StaticResource TableHeader}" Padding="8" ColumnDefinitions="2*,*,*,*"><Label Text="商品" /><Label Grid.Column="1" Text="保管場所" /><Label Grid.Column="2" Text="期限" /><Label Grid.Column="3" Text="数量" /></Grid></CollectionView.Header>
+          <CollectionView.ItemTemplate><DataTemplate><Grid Padding="8" ColumnDefinitions="2*,*,*,*"><Label Text="{Binding ProductName}" /><Label Grid.Column="1" Text="{Binding LocationName}" /><Label Grid.Column="2" Text="{Binding ExpiresOn}" /><Label Grid.Column="3" Text="{Binding Quantity}" /></Grid></DataTemplate></CollectionView.ItemTemplate>
+        </CollectionView>
+      </VerticalStackLayout>
+
+      <VerticalStackLayout IsVisible="{Binding IsSection1Visible}" Spacing="8">
+        <Label Style="{StaticResource SectionTitle}" Text="商品一覧" />
+        <HorizontalStackLayout Spacing="8"><Entry WidthRequest="280" Placeholder="商品名・JANで検索" Text="{Binding ProductSearch}" /><Button Command="{Binding EditProductCommand}" Text="選択商品を編集" /><Button Command="{Binding DeleteProductCommand}" Text="選択商品を削除" /></HorizontalStackLayout>
+        <CollectionView ItemsSource="{Binding VisibleProducts}" SelectedItem="{Binding SelectedProduct}" SelectionMode="Single" VerticalOptions="FillAndExpand">
+          <CollectionView.Header><Grid Style="{StaticResource TableHeader}" Padding="8" ColumnDefinitions="2*,*,*,*,*"><Label Text="商品名" /><Label Grid.Column="1" Text="JAN" /><Label Grid.Column="2" Text="単位" /><Label Grid.Column="3" Text="補充点" /><Label Grid.Column="4" Text="目標在庫" /></Grid></CollectionView.Header>
+          <CollectionView.ItemTemplate><DataTemplate><Grid Padding="8" ColumnDefinitions="2*,*,*,*,*"><Label Text="{Binding Name}" /><Label Grid.Column="1" Text="{Binding Barcode}" /><Label Grid.Column="2" Text="{Binding Unit}" /><Label Grid.Column="3" Text="{Binding ReorderPoint}" /><Label Grid.Column="4" Text="{Binding TargetQuantity}" /></Grid></DataTemplate></CollectionView.ItemTemplate>
+        </CollectionView>
+      </VerticalStackLayout>
+
+      <VerticalStackLayout IsVisible="{Binding IsSection2Visible}" Spacing="8">
+        <Label Style="{StaticResource SectionTitle}" Text="保管場所一覧" />
+        <HorizontalStackLayout Spacing="8"><Button Command="{Binding EditLocationCommand}" Text="選択した保管場所を編集" /><Button Command="{Binding DeleteLocationCommand}" Text="選択した保管場所を削除" /></HorizontalStackLayout>
+        <CollectionView ItemsSource="{Binding Locations}" SelectedItem="{Binding SelectedLocation}" SelectionMode="Single" VerticalOptions="FillAndExpand">
+          <CollectionView.Header><Grid Style="{StaticResource TableHeader}" Padding="8" ColumnDefinitions="2*,*"><Label Text="名称" /><Label Grid.Column="1" Text="表示順" /></Grid></CollectionView.Header>
+          <CollectionView.ItemTemplate><DataTemplate><Grid Padding="8" ColumnDefinitions="2*,*"><Label Text="{Binding Name}" /><Label Grid.Column="1" Text="{Binding SortOrder}" /></Grid></DataTemplate></CollectionView.ItemTemplate>
+        </CollectionView>
+      </VerticalStackLayout>
+
+      <Grid IsVisible="{Binding IsSection3Visible}" RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="8">
+        <Label Style="{StaticResource SectionTitle}" Text="在庫一覧・棚卸" />
+        <HorizontalStackLayout Grid.Row="1" Spacing="8"><Entry WidthRequest="260" Placeholder="商品・JAN・保管場所で絞り込み" Text="{Binding InventoryFilter}" /><Button Command="{Binding RefreshCommand}" Text="更新" /><Button Command="{Binding ExportCommand}" Text="CSV出力" /></HorizontalStackLayout>
+        <CollectionView Grid.Row="2" ItemsSource="{Binding VisibleInventory}" SelectedItem="{Binding SelectedInventory}" SelectionMode="Single">
+          <CollectionView.Header><Grid Style="{StaticResource TableHeader}" Padding="8" ColumnDefinitions="2*,*,*,*,*,*"><Label Text="商品" /><Label Grid.Column="1" Text="JAN" /><Label Grid.Column="2" Text="保管場所" /><Label Grid.Column="3" Text="期限" /><Label Grid.Column="4" Text="数量" /><Label Grid.Column="5" Text="単位" /></Grid></CollectionView.Header>
+          <CollectionView.ItemTemplate><DataTemplate><Grid Padding="8" ColumnDefinitions="2*,*,*,*,*,*"><Label Text="{Binding ProductName}" /><Label Grid.Column="1" Text="{Binding Barcode}" /><Label Grid.Column="2" Text="{Binding LocationName}" /><Label Grid.Column="3" Text="{Binding ExpiresOn}" /><Label Grid.Column="4" Text="{Binding Quantity}" /><Label Grid.Column="5" Text="{Binding Unit}" /></Grid></DataTemplate></CollectionView.ItemTemplate>
+        </CollectionView>
+        <HorizontalStackLayout Grid.Row="3" Spacing="8"><Label Text="棚卸実数" VerticalOptions="Center" /><Entry WidthRequest="100" Keyboard="Numeric" Text="{Binding CountedQuantity}" /><Button Command="{Binding AdjustCommand}" Text="選択ロットを調整" /></HorizontalStackLayout>
+                <HorizontalStackLayout Grid.Row="4" Spacing="8">
+                    <Label Text="商品" VerticalOptions="Center" />
+                    <Picker WidthRequest="190" ItemsSource="{Binding VisibleProducts}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedStockProduct}" />
+                    <Label Text="保管場所" VerticalOptions="Center" />
+                    <Picker WidthRequest="170" ItemsSource="{Binding Locations}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedStockLocation}" />
+                    <Label Text="数量" VerticalOptions="Center" />
+                    <Entry WidthRequest="80" Keyboard="Numeric" Text="{Binding StockQuantity}" />
+                    <Grid ColumnDefinitions="Auto,24,Auto" ColumnSpacing="4" HorizontalOptions="Start">
+                      <Label Text="期限あり" VerticalOptions="Center" />
+                      <CheckBox
+                          Grid.Column="1"
+                          IsChecked="{Binding HasStockExpiry}"
+                          MinimumWidthRequest="24"
+                          WidthRequest="24"
+                          HorizontalOptions="Center" />
+                      <DatePicker
+                          Grid.Column="2"
+                          Date="{Binding StockExpiryDate}"
+                          IsEnabled="{Binding HasStockExpiry}" />
+                    </Grid>
+                    <Button Command="{Binding ReceiveCommand}" Text="入庫" />
+                    <Button Command="{Binding ConsumeCommand}" Text="消費" />
+                  </HorizontalStackLayout>
+      </Grid>
+
+      <Grid IsVisible="{Binding IsSection4Visible}" RowDefinitions="Auto,Auto,*" RowSpacing="8">
+        <Label Style="{StaticResource SectionTitle}" Text="買い物リスト" />
+        <HorizontalStackLayout Grid.Row="1" Spacing="8"><Entry WidthRequest="220" Placeholder="品名" Text="{Binding ShoppingName}" /><Entry WidthRequest="80" Keyboard="Numeric" Text="{Binding ShoppingQuantity}" /><Button Command="{Binding AddShoppingItemCommand}" Text="追加" /><Button Command="{Binding GenerateShoppingCommand}" Text="不足品を提案" /><Button Command="{Binding ToggleShoppingItemCommand}" Text="購入／未購入を切替" /></HorizontalStackLayout>
+        <CollectionView Grid.Row="2" ItemsSource="{Binding ShoppingItems}" SelectedItem="{Binding SelectedShoppingItem}" SelectionMode="Single">
+          <CollectionView.Header><Grid Style="{StaticResource TableHeader}" Padding="8" ColumnDefinitions="2*,*,*,*"><Label Text="品名" /><Label Grid.Column="1" Text="数量" /><Label Grid.Column="2" Text="追加元" /><Label Grid.Column="3" Text="状態" /></Grid></CollectionView.Header>
+          <CollectionView.ItemTemplate><DataTemplate><Grid Padding="8" ColumnDefinitions="2*,*,*,*"><Label Text="{Binding Name}" /><Label Grid.Column="1" Text="{Binding Quantity}" /><Label Grid.Column="2" Text="{Binding Source}" /><Label Grid.Column="3" Text="{Binding Status}" /></Grid></DataTemplate></CollectionView.ItemTemplate>
+        </CollectionView>
+      </Grid>
+
+      <Grid IsVisible="{Binding IsSection5Visible}" ColumnDefinitions="2*,*" ColumnSpacing="16">
+        <Border Padding="16"><VerticalStackLayout Spacing="8"><Label Style="{StaticResource SectionTitle}" Text="商品マスター登録" /><Entry Placeholder="商品名" Text="{Binding ProductName}" /><Entry Placeholder="JANコード" MaxLength="13" Keyboard="Numeric" Text="{Binding ProductBarcode}" /><Entry Placeholder="単位" MaxLength="20" Text="{Binding ProductUnit}" /><Entry Placeholder="補充点" Keyboard="Numeric" Text="{Binding ReorderPoint}" /><Entry Placeholder="目標在庫" Keyboard="Numeric" Text="{Binding TargetQuantity}" /><HorizontalStackLayout Spacing="8"><Button Command="{Binding SaveProductCommand}" Text="{Binding SaveProductText}" /><Button Command="{Binding CancelProductEditCommand}" Text="編集をキャンセル" /></HorizontalStackLayout></VerticalStackLayout></Border>
+        <Border Grid.Column="1" Padding="16"><VerticalStackLayout Spacing="8"><Label Style="{StaticResource SectionTitle}" Text="保管場所登録" /><Entry Placeholder="名称" Text="{Binding LocationName}" /><Entry Placeholder="表示順" Keyboard="Numeric" Text="{Binding LocationSortOrder}" /><HorizontalStackLayout Spacing="8"><Button Command="{Binding SaveLocationCommand}" Text="{Binding SaveLocationText}" /><Button Command="{Binding CancelLocationEditCommand}" Text="編集をキャンセル" /></HorizontalStackLayout></VerticalStackLayout></Border>
+      </Grid>
+
+      <VerticalStackLayout IsVisible="{Binding IsSection6Visible}" Spacing="8"><Label Style="{StaticResource SectionTitle}" Text="スキャン履歴" /><CollectionView ItemsSource="{Binding ScanHistory}" SelectionMode="None" VerticalOptions="FillAndExpand"><CollectionView.ItemTemplate><DataTemplate><Label Padding="8" Text="{Binding .}" /></DataTemplate></CollectionView.ItemTemplate></CollectionView></VerticalStackLayout>
+    </Grid>
+
+    <Label Grid.Row="4" Style="{StaticResource StatusLabel}" Text="{Binding Status}" />
+  </Grid>
+</ContentPage>

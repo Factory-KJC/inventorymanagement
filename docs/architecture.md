@@ -2,7 +2,7 @@
 
 ## 1. 方針
 
-家庭内運用で保守しやすいモジュラーモノリスとします。WebとWPFは同じHTTP APIだけを利用し、DBへ直接接続しません。スキャナとプリンタの機種依存処理はWPF側のアダプタへ閉じ込めます。
+家庭内運用で保守しやすいモジュラーモノリスとします。WebとWindowsクライアントは同じHTTP APIだけを利用し、DBへ直接接続しません。スキャナとプリンタの機種依存処理はWindowsクライアント側のアダプタへ閉じ込めます。
 
 ## 2. コンポーネント
 
@@ -11,7 +11,7 @@
 | Mobile Web | PWA / TypeScript | 日常操作、買い物、オフライン時の操作キュー |
 | Web API | ASP.NET Core 8 | 認証、ユースケース、検証、監査 |
 | Database | PostgreSQL | 商品、在庫履歴、買い物リストの永続化 |
-| Windows Client | .NET 8 WPF / MVVM | 高度な一覧、棚卸、デバイス連携 |
+| Windows Client | .NET 10 MAUI / WinUI 3 / MVVM | 高度な一覧、棚卸、デバイス連携 |
 | Scanner Adapter | USB-HID | スキャン値をアプリ共通イベントへ変換 |
 | Print Worker | Linux / ESC/POS over TCP | 80mm紙への整形、印刷キュー、再印刷 |
 | Reverse Proxy | Caddy | TLS証明書、HTTPS終端、セキュリティヘッダー |
@@ -86,17 +86,17 @@ GET    /api/shopping-lists/current/print
 - 初回利用者は設定用CLIではなく、一度だけ有効なセットアップ画面で作成
 - JWT秘密鍵やDB接続情報はリポジトリへ置かず、Linuxサーバー上のsecretとして注入
 - APIの認証は短命アクセストークンとローテーションする更新トークンを使用
-- 更新トークンはHttpOnly・Secure・SameSite Cookie、WPFではWindows資格情報ストアに保存
+- 更新トークンはHttpOnly・Secure・SameSite Cookie、WindowsクライアントではWindows資格情報ストアに保存
 - PostgreSQLの日次バックアップを別媒体へ暗号化保存し、復元手順も定期的に確認する
 - ヘルスチェック、構造化ログ、相関IDを用意する
 
 ## 7. デバイス境界
 
-NetumScan NSL8BLはWindows端末へ2.4GHzレシーバーまたはUSBで接続し、HIDキーボードモードで使用します。読み取り終端をEnterに設定し、WPF側は短時間に入力された文字列と終端キーを1スキャンとして扱います。通常のキーボード入力と区別できるよう、スキャン専用画面で受け付けます。Bluetoothは予備の接続手段とします。
+NetumScan NSL8BLはWindows端末へ2.4GHzレシーバーまたはUSBで接続し、HIDキーボードモードで使用します。読み取り終端をEnterに設定し、WinUI 3側は短時間に入力された文字列と終端キーを1スキャンとして扱います。Bluetoothは予備の接続手段とします。
 
 EPSON TM-T90II TM902UE211は80mm紙・有線LAN（100BASE-TX/10BASE-T）モデルです。家庭内LANへ接続してDHCP予約でアドレスを固定し、Linux上のPrint Workerからネットワーク経由で印刷します。`IReceiptPrinter`境界の背後にESC/POS送信を実装し、開発用のPDF/テキスト出力と実機出力を差し替え可能にします。
 
-印刷要求はDBの印刷ジョブへ保存してから処理します。プリンタの電源断、紙切れ、通信断は在庫処理へ影響させず、失敗ジョブを再実行できるようにします。プリンタは家庭内LANからだけ到達可能にし、インターネットへポートを公開しません。Windows WPFはAPIへ印刷を依頼し、プリンタへ直接接続しません。
+印刷要求はDBの印刷ジョブへ保存してから処理します。プリンタの電源断、紙切れ、通信断は在庫処理へ影響させず、失敗ジョブを再実行できるようにします。プリンタは家庭内LANからだけ到達可能にし、インターネットへポートを公開しません。WindowsクライアントはAPIへ印刷を依頼し、プリンタへ直接接続しません。
 
 ## 8. 配備構成
 
@@ -108,7 +108,7 @@ flowchart TB
         direction TB
 
         subgraph Windows["Windows PC"]
-            WPF["WPF Client<br/>MVVM"]
+            WPF["MAUI / WinUI 3 Client<br/>MVVM"]
             Scanner["NetumScan NSL8BL<br/>USB-HID / 2.4GHz"]
             Scanner -->|"バーコード入力"| WPF
         end

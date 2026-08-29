@@ -4,7 +4,8 @@
 
 - セットアップトークンで保護した初回利用者登録、JWTログイン、更新トークンのローテーション
 - 商品の登録、編集、一覧、JANコード検索
-- 保管場所の登録、一覧
+- 商品・保管場所の論理削除、削除済み候補検索、復元
+- 保管場所の登録、編集、一覧
 - 期限・保管場所単位の入庫
 - 期限が近いロットからの自動消費・廃棄（FEFO）
 - ロット単位の棚卸調整
@@ -28,6 +29,16 @@ Swaggerは開発環境の`/swagger`で確認できます。具体的なリクエ
 ## 商品編集
 
 `PATCH /api/products/{id}`へ商品名、JANコード、単位、補充点、目標在庫を送ると、商品マスターを更新します。このAPIは全編集項目を受け取ります。JANコードの登録を解除する場合は`barcode`に`null`を指定してください。別の商品が使用しているJANコードは指定できません。
+
+## 保管場所編集
+
+`PATCH /api/locations/{id}`へ名称と表示順を送ると、保管場所を更新します。同じ世帯内で既に使われている名称は指定できません。更新後の名称は既存の在庫ロットにも反映されます。
+
+## マスターの削除と復元
+
+`DELETE /api/products/{id}`と`DELETE /api/locations/{id}`は論理削除です。在庫ロットと移動履歴は保持され、通常の商品・保管場所一覧と新規入庫の選択肢から削除済み項目だけを除外します。
+
+再登録時の候補は`GET /api/products/deleted-suggestions?name={name}`または`GET /api/locations/deleted-suggestions?name={name}`で取得します。2文字未満は候補を返さず、2文字以上で削除済み名称との同一・部分一致を検索します。復元する場合は`POST /api/products/{id}/restore`または`POST /api/locations/{id}/restore`へ更新後の項目を送ります。
 
 ## 在庫コマンド
 
@@ -87,7 +98,7 @@ Content-Type: application/json
 }
 ```
 
-`generatedAt`は印刷用データを取得したUTC時刻です。APIは用紙幅やフォントなどのレイアウトを持たず、WPFや将来のPrint Workerがこのデータを58mm・80mm等の出力形式へ整形します。
+`generatedAt`は印刷用データを取得したUTC時刻です。APIは用紙幅やフォントなどのレイアウトを持たず、Windowsクライアントや将来のPrint Workerがこのデータを58mm・80mm等の出力形式へ整形します。
 
 ## JANコード
 

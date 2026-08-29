@@ -23,3 +23,5 @@ public sealed record ProductResponse(
     string Unit,
     decimal? ReorderPoint,
     decimal? TargetQuantity);
+
+public sealed record DeletedProductSuggestionResponse(Guid Id, string Name, string? Barcode, string Unit);

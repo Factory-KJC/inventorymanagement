@@ -25,11 +25,34 @@ docker compose up --build
 - Liveness: `http://localhost:8080/health/live`
 - Readiness: `http://localhost:8080/health/ready`
 
-PostgreSQLはホストへポート公開していません。DBを直接調査する場合は次を使用します。
+PostgreSQLは開発ホストのloopbackだけにポートを公開します。DBコンテナはAPI用の内部ネットワークと、loopback公開を成立させる独立した管理ネットワークへ接続します。LANやインターネットからは接続できません。DBを直接調査する場合は次を使用します。
 
 ```powershell
 docker compose exec db psql -U homestock -d homestock
 ```
+
+### pgAdmin 4から開発DBを確認する
+
+Windows上のpgAdmin 4から接続する場合、開発用Composeを起動します。
+
+```powershell
+docker compose up -d db api
+```
+
+pgAdmin 4で「Register」→「Server」を選び、次の値を入力します。
+
+| 項目 | 値 |
+| --- | --- |
+| Name | `Home Stock Development`（任意） |
+| Host name/address | `localhost` |
+| Port | `.env`の`POSTGRES_PORT`。未指定時は`5432` |
+| Maintenance database | `.env`の`POSTGRES_DB`。既定値は`homestock` |
+| Username | `.env`の`POSTGRES_USER`。既定値は`homestock` |
+| Password | `.env`の`POSTGRES_PASSWORD` |
+
+登録後、`Databases` → `homestock` → `Schemas` → `public` → `Tables`からテーブルを開き、「View/Edit Data」→「All Rows」で内容を確認できます。
+
+本番ではloopbackを含めてDBポートを不要にする場合、ホストのファイアウォールとCompose設定で閉じてください。少なくとも5432番ポートをLANやインターネットへ公開してはいけません。
 
 停止は`docker compose down`です。DBデータは名前付きVolumeに残ります。DBも消す`docker compose down --volumes`は開発データを破棄するため、明示的に初期化するときだけ使用します。
 

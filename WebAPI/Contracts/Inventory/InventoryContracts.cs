@@ -4,7 +4,9 @@ using InventoryAPI.Domain.Inventory;
 namespace InventoryAPI.Contracts.Inventory;
 
 public sealed record CreateLocationRequest([Required, StringLength(100)] string Name, int SortOrder = 0);
+public sealed record UpdateLocationRequest([Required, StringLength(100)] string Name, int SortOrder = 0);
 public sealed record LocationResponse(Guid Id, string Name, int SortOrder);
+public sealed record DeletedLocationSuggestionResponse(Guid Id, string Name, int SortOrder);
 
 public sealed record ReceiveStockRequest(
     Guid ProductId,

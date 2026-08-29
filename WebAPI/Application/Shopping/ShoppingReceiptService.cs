@@ -62,6 +62,7 @@ public sealed class ShoppingReceiptService(ApplicationDbContext db, TimeProvider
         var locationIds = requestedItems.Values.Select(item => item.LocationId).Distinct().ToList();
         var existingLocationCount = await db.Locations.CountAsync(
             location => location.HouseholdId == SystemDefaults.HouseholdId &&
+                        !location.IsDeleted &&
                         locationIds.Contains(location.Id),
             cancellationToken);
         if (existingLocationCount != locationIds.Count)

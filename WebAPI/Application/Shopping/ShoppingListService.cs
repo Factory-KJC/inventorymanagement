@@ -88,7 +88,7 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
         var list = await GetOrCreateCurrentAsync(cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);
         var products = await db.Products
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && product.ReorderPoint != null)
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted && product.ReorderPoint != null)
             .ToListAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
 
@@ -188,7 +188,7 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
 
     private async Task<bool> ProductExistsAsync(Guid productId, CancellationToken cancellationToken) =>
         await db.Products.AnyAsync(
-            product => product.Id == productId && product.HouseholdId == SystemDefaults.HouseholdId,
+            product => product.Id == productId && product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted,
             cancellationToken);
 
     private async Task<Dictionary<Guid, decimal>> GetQuantityByProductAsync(CancellationToken cancellationToken)

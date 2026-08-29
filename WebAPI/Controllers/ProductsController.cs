@@ -29,7 +29,7 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         [FromQuery] string? barcode,
         CancellationToken cancellationToken)
     {
-        var products = db.Products.AsNoTracking().Where(x => x.HouseholdId == SystemDefaults.HouseholdId);
+        var products = db.Products.AsNoTracking().Where(x => x.HouseholdId == SystemDefaults.HouseholdId && !x.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(query))
         {
@@ -64,7 +64,7 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
     public async Task<ActionResult<ProductResponse>> GetProduct(Guid id, CancellationToken cancellationToken)
     {
         var product = await db.Products.AsNoTracking()
-            .Where(x => x.Id == id && x.HouseholdId == SystemDefaults.HouseholdId)
+            .Where(x => x.Id == id && x.HouseholdId == SystemDefaults.HouseholdId && !x.IsDeleted)
             .Select(product => new ProductResponse(
                 product.Id,
                 product.Name,
@@ -137,7 +137,7 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         CancellationToken cancellationToken)
     {
         var product = await db.Products.SingleOrDefaultAsync(
-            product => product.Id == id && product.HouseholdId == SystemDefaults.HouseholdId,
+                product => product.Id == id && product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted,
             cancellationToken);
         if (product is null)
         {
@@ -186,6 +186,91 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         product.UpdatedAt = timeProvider.GetUtcNow();
         await db.SaveChangesAsync(cancellationToken);
 
+        return Ok(ToResponse(product));
+    }
+
+    /// <summary>商品を履歴から参照可能な状態で論理削除します。</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteProduct(Guid id, CancellationToken cancellationToken)
+    {
+        var product = await db.Products.SingleOrDefaultAsync(
+            product => product.Id == id && product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted,
+            cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        product.IsDeleted = true;
+        product.DeletedAt = timeProvider.GetUtcNow();
+        product.UpdatedAt = timeProvider.GetUtcNow();
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>入力名と2文字以上の部分一致をする削除済み商品を返します。</summary>
+    [HttpGet("deleted-suggestions")]
+    public async Task<ActionResult<IReadOnlyList<DeletedProductSuggestionResponse>>> GetDeletedSuggestions(
+        [FromQuery] string name,
+        CancellationToken cancellationToken)
+    {
+        var normalizedName = name.Trim();
+        if (normalizedName.Length < 2)
+        {
+            return Ok(Array.Empty<DeletedProductSuggestionResponse>());
+        }
+
+        var deletedProducts = await db.Products.AsNoTracking()
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && product.IsDeleted)
+            .ToListAsync(cancellationToken);
+        return deletedProducts
+            .Where(product => MasterNameMatcher.IsPartialMatch(product.Name, normalizedName))
+            .OrderByDescending(product => string.Equals(product.Name, normalizedName, StringComparison.CurrentCultureIgnoreCase))
+            .ThenBy(product => product.Name)
+            .Select(product => new DeletedProductSuggestionResponse(product.Id, product.Name, product.Barcode, product.Unit))
+            .Take(10)
+            .ToList();
+    }
+
+    /// <summary>削除済み商品を入力された最新情報で復元します。</summary>
+    [HttpPost("{id:guid}/restore")]
+    public async Task<ActionResult<ProductResponse>> RestoreProduct(
+        Guid id,
+        UpdateProductRequest request,
+        CancellationToken cancellationToken)
+    {
+        var product = await db.Products.SingleOrDefaultAsync(
+            product => product.Id == id && product.HouseholdId == SystemDefaults.HouseholdId && product.IsDeleted,
+            cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var name = request.Name.Trim();
+        var unit = request.Unit.Trim();
+        var barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
+        if (name.Length == 0 || unit.Length == 0 || !BarcodeValidator.IsValid(barcode))
+        {
+            return ValidationProblem("商品名、単位、JANコードを確認してください。");
+        }
+
+        if (await db.Products.AnyAsync(other => other.HouseholdId == SystemDefaults.HouseholdId &&
+                !other.IsDeleted && other.Id != id &&
+                ((barcode != null && other.Barcode == barcode) || other.Name == name), cancellationToken))
+        {
+            return Conflict(new ProblemDetails { Title = "同じ商品名またはJANコードの商品が存在します。", Status = StatusCodes.Status409Conflict });
+        }
+
+        product.Name = name;
+        product.Barcode = barcode;
+        product.Unit = unit;
+        product.ReorderPoint = request.ReorderPoint;
+        product.TargetQuantity = request.TargetQuantity;
+        product.IsDeleted = false;
+        product.DeletedAt = null;
+        product.UpdatedAt = timeProvider.GetUtcNow();
+        await db.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(product));
     }
 

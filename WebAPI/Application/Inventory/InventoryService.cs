@@ -246,8 +246,8 @@ public sealed class InventoryService(ApplicationDbContext db, TimeProvider timeP
             cancellationToken);
 
     private async Task<bool> ProductAndLocationExistAsync(Guid productId, Guid locationId, CancellationToken cancellationToken) =>
-        await db.Products.AnyAsync(x => x.Id == productId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken) &&
-        await db.Locations.AnyAsync(x => x.Id == locationId && x.HouseholdId == SystemDefaults.HouseholdId, cancellationToken);
+        await db.Products.AnyAsync(x => x.Id == productId && x.HouseholdId == SystemDefaults.HouseholdId && !x.IsDeleted, cancellationToken) &&
+        await db.Locations.AnyAsync(x => x.Id == locationId && x.HouseholdId == SystemDefaults.HouseholdId && !x.IsDeleted, cancellationToken);
 
     private static StockOperation CreateOperation(
         string idempotencyKey,

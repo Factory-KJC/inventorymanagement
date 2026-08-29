@@ -25,12 +25,14 @@ APIはLinuxコンテナとして構築し、Windows開発環境とDebian本番�
 
 スマートフォンPWAはAPIのルートURL（開発環境では`http://localhost:8080/`）から配信されます。
 
+Windowsクライアントは.NET 10 MAUI（WinUI 3）で `WinApp/HomeStock.Windows/` に実装しています。起動方法とスキャナ設定は[Windowsクライアント利用ガイド](docs/windows-client.md)を参照してください。
+
 ## 構成
 
 ```text
 スマートフォン PWA ─ HTTPS ─┐
                             ├─ Linux / Web API ─ PostgreSQL
-Windows WPF ─────── HTTPS ──┘
+Windows MAUI / WinUI 3 ─ HTTPS ─┘
    └─ NetumScan NSL8BL（USB-HID）
 
 家庭内LAN ─ EPSON TM-T90II TM902UE211（有線LAN / 80mm）
@@ -43,7 +45,7 @@ Windows WPF ─────── HTTPS ──┘
 - 保管場所別、期限別の在庫を確認できる
 - 補充基準を下回った商品が買い物リストへ提案される
 - 買い物完了を入庫へ変換できる
-- WPFでスキャン登録と買い物リスト印刷ができる
+- Windowsクライアントでスキャン登録と買い物リスト印刷ができる
 
 ## 実装状況
 
