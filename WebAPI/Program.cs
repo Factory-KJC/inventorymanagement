@@ -5,11 +5,26 @@ using Microsoft.EntityFrameworkCore;
 const int migrationAttempts = 10;
 var builder = WebApplication.CreateBuilder(args);
 
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
+}
+
 builder.Services.AddHomeStockApi(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
+app.Use(async (context, next) =>
+{
+    const string correlationHeader = "X-Correlation-ID";
+    var correlationId = context.Request.Headers[correlationHeader].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
+    context.Response.Headers[correlationHeader] = correlationId;
+    using (app.Logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId }))
+        await next(context);
+});
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -20,6 +35,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(ServiceCollectionExtensions.WebClientCorsPolicy);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

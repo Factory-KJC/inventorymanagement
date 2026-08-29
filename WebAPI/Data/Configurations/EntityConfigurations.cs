@@ -25,6 +25,20 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
     }
 }
 
+internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
+{
+    public void Configure(EntityTypeBuilder<RefreshToken> entity)
+    {
+        entity.ToTable("refresh_tokens", DatabaseSchema.Inventory);
+        entity.Property(token => token.TokenHash).HasMaxLength(64);
+        entity.HasIndex(token => token.TokenHash).IsUnique();
+        entity.HasOne(token => token.User)
+            .WithMany(user => user.RefreshTokens)
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 internal sealed class HouseholdConfiguration : IEntityTypeConfiguration<Household>
 {
     public void Configure(EntityTypeBuilder<Household> entity)

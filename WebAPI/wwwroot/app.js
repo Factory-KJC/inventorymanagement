@@ -5,6 +5,7 @@ const API = Object.freeze({
   inventory: "/api/inventory",
   shoppingList: "/api/shopping-lists/current",
   login: "/api/auth/login",
+  refresh: "/api/auth/refresh",
   register: "/api/users/register",
   receiveStock: "/api/inventory/receive",
   consumeStock: "/api/inventory/consume"
@@ -12,6 +13,7 @@ const API = Object.freeze({
 
 const STORAGE_KEYS = Object.freeze({
   token: "home-stock-token",
+  refreshToken: "home-stock-refresh-token",
   commandDatabase: "home-stock",
   commandStore: "commands"
 });
@@ -25,6 +27,7 @@ const DASHBOARD_TITLES = Object.freeze({
 
 const state = {
   token: sessionStorage.getItem(STORAGE_KEYS.token),
+  refreshToken: sessionStorage.getItem(STORAGE_KEYS.refreshToken),
   products: [],
   locations: [],
   inventory: [],
@@ -60,7 +63,7 @@ const escapeHtml = value => String(value ?? "").replace(
 // API通信と共通UI
 // -----------------------------------------------------------------------------
 
-async function api(path, options = {}) {
+async function api(path, options = {}, canRefresh = true) {
   const headers = new Headers(options.headers || {});
   if (state.token) {
     headers.set("Authorization", `Bearer ${state.token}`);
@@ -70,6 +73,12 @@ async function api(path, options = {}) {
   }
 
   const response = await fetch(path, { ...options, headers });
+  if (response.status === 401 && canRefresh && state.refreshToken && path !== API.refresh) {
+    const refreshed = await refreshAuthentication();
+    if (refreshed) {
+      return api(path, options, false);
+    }
+  }
   if (response.status === 401) {
     logout();
     throw new ApiError("ログインの有効期限が切れました。", response.status);
@@ -83,6 +92,28 @@ async function api(path, options = {}) {
   }
 
   return response.status === 204 ? null : response.json();
+}
+
+async function refreshAuthentication() {
+  const response = await fetch(API.refresh, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken: state.refreshToken })
+  });
+  if (!response.ok) {
+    return false;
+  }
+
+  const result = await response.json();
+  saveAuthentication(result);
+  return true;
+}
+
+function saveAuthentication(result) {
+  state.token = result.token;
+  state.refreshToken = result.refreshToken;
+  sessionStorage.setItem(STORAGE_KEYS.token, state.token);
+  sessionStorage.setItem(STORAGE_KEYS.refreshToken, state.refreshToken);
 }
 
 function toast(message) {
@@ -105,12 +136,14 @@ function showApp(authenticated) {
 
 function logout() {
   state.token = null;
+  state.refreshToken = null;
   state.products = [];
   state.locations = [];
   state.inventory = [];
   state.shopping = null;
   state.dashboardList = null;
   sessionStorage.removeItem(STORAGE_KEYS.token);
+  sessionStorage.removeItem(STORAGE_KEYS.refreshToken);
   $$('dialog[open]').forEach(dialog => dialog.close());
   $("#password").value = "";
   $("#login-error").textContent = "";
@@ -360,8 +393,7 @@ async function handleLogin(event) {
         password: $("#password").value
       })
     });
-    state.token = result.token;
-    sessionStorage.setItem(STORAGE_KEYS.token, state.token);
+    saveAuthentication(result);
     showApp(true);
     await replayQueue();
   } catch (error) {
@@ -371,8 +403,10 @@ async function handleLogin(event) {
 
 async function registerInitialUser() {
   try {
+    const setupToken = $("#setup-token").value;
     await api(API.register, {
       method: "POST",
+      headers: setupToken ? { "X-Setup-Token": setupToken } : {},
       body: JSON.stringify({
         username: $("#username").value,
         password: $("#password").value

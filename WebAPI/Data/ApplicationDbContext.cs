@@ -14,6 +14,7 @@ namespace InventoryAPI.Data;
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Household> Households => Set<Household>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Location> Locations => Set<Location>();

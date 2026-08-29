@@ -12,4 +12,6 @@ public sealed class User
     /// BCryptで生成したパスワードハッシュです。平文パスワードは保存しません。
     /// </summary>
     public string PasswordHash { get; set; } = string.Empty;
+
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
 }

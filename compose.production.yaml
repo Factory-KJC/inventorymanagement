@@ -21,6 +21,11 @@ services:
       api:
         condition: service_healthy
     networks: [edge]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   caddy-data:

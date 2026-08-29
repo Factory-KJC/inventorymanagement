@@ -13,6 +13,7 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-home-stock}
       Jwt__Audience: ${JWT_AUDIENCE:-home-stock-clients}
       Jwt__Key: ${JWT_KEY:?set a random JWT_KEY of at least 32 bytes in .env}
+      Setup__Token: ${SETUP_TOKEN:?set a one-time SETUP_TOKEN in .env}
       Database__AutoMigrate: ${DATABASE_AUTO_MIGRATE:-true}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:3000}
     ports:
@@ -26,6 +27,11 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks: [backend, edge]
 
   db:
@@ -42,6 +48,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks: [backend]
 
 volumes:
