@@ -48,7 +48,7 @@
       </section>
 
       <section id="inventory-page" class="page">
-        <div class="toolbar"><input id="inventory-search" type="search" placeholder="商品名・JANコードで検索"><button id="open-receive" class="primary compact">入庫</button></div>
+        <div class="toolbar"><input id="inventory-search" type="search" placeholder="商品名・JANコードで検索"><select id="inventory-sort" aria-label="在庫の並び順"><option value="name:asc">商品名（昇順）</option><option value="name:desc">商品名（降順）</option><option value="expiration:asc">期限が近い順</option><option value="quantity:asc">数量が少ない順</option><option value="quantity:desc">数量が多い順</option></select><button id="open-receive" class="primary compact">入庫</button></div>
         <div id="inventory-list" class="card-list"></div>
       </section>
 

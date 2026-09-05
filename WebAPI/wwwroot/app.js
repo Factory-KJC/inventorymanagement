@@ -25,6 +25,8 @@ const DASHBOARD_TITLES = Object.freeze({
   shopping: "買うもの"
 });
 
+const MAXIMUM_DISPLAY_RECORDS = 20;
+
 const state = {
   token: sessionStorage.getItem(STORAGE_KEYS.token),
   refreshToken: sessionStorage.getItem(STORAGE_KEYS.refreshToken),
@@ -157,7 +159,7 @@ async function refreshAll() {
       api(API.dashboard),
       api(API.products),
       api(API.locations),
-      api(API.inventory),
+      fetchInventory(),
       api(API.shoppingList)
     ]);
 
@@ -170,6 +172,25 @@ async function refreshAll() {
     renderInventory();
     renderShopping();
     fillSelectors();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function getInventoryRequestPath() {
+  const query = $("#inventory-search")?.value.trim() || "";
+  const [sortBy, sortOrder] = ($("#inventory-sort")?.value || "name:asc").split(":");
+  return `${API.inventory}?query=${encodeURIComponent(query)}&sortBy=${sortBy}&sortOrder=${sortOrder}&limit=${MAXIMUM_DISPLAY_RECORDS}`;
+}
+
+function fetchInventory() {
+  return api(getInventoryRequestPath());
+}
+
+async function reloadInventory() {
+  try {
+    state.inventory = await fetchInventory();
+    renderInventory();
   } catch (error) {
     toast(error.message);
   }
@@ -277,7 +298,7 @@ function renderInventory() {
 }
 
 function renderShopping() {
-  const items = state.shopping?.items || [];
+  const items = (state.shopping?.items || []).slice(0, MAXIMUM_DISPLAY_RECORDS);
   $("#shopping-list").innerHTML = items.length
     ? items.map(shoppingItemCard).join("")
     : emptyCard("買い物リストは空です");
@@ -597,7 +618,8 @@ function bindEvents() {
   $("#login-form").addEventListener("submit", handleLogin);
   $("#setup-button").onclick = registerInitialUser;
   $("#logout").onclick = logout;
-  $("#inventory-search").oninput = renderInventory;
+  $("#inventory-search").onchange = reloadInventory;
+  $("#inventory-sort").onchange = reloadInventory;
   $("#quick-receive").onclick = $("#open-receive").onclick = () => openDialog("stock-dialog");
   $("#quick-product").onclick = () => openDialog("product-dialog");
   $("#product-form").onsubmit = handleProductSubmit;

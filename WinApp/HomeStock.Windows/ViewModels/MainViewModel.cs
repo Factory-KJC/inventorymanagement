@@ -30,6 +30,7 @@ public sealed class MainViewModel : ObservableObject
     private string _simulatedBarcode = string.Empty;
     private string _productSearch = string.Empty;
     private string _inventoryFilter = string.Empty;
+    private int _selectedInventorySortIndex;
     private string _productName = string.Empty;
     private string _productBarcode = string.Empty;
     private string _productUnit = "個";
@@ -77,6 +78,7 @@ public sealed class MainViewModel : ObservableObject
         LogoutCommand = new RelayCommand(Logout);
         SimulateScanCommand = new AsyncRelayCommand(() => ProcessBarcodeAsync(SimulatedBarcode));
         RefreshCommand = new AsyncRelayCommand(() => RunUiActionAsync(LoadReferenceDataAsync));
+        ReloadInventoryCommand = new AsyncRelayCommand(() => RunUiActionAsync(LoadInventoryAsync));
         SaveProductCommand = new AsyncRelayCommand(SaveProductAsync);
         EditProductCommand = new RelayCommand(EditProduct);
         CancelProductEditCommand = new RelayCommand(ClearProductEditor);
@@ -104,12 +106,14 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ShoppingItemResponse> ShoppingItems { get; } = [];
     public ObservableCollection<string> ScanHistory { get; } = [];
     public IReadOnlyList<string> PrintPaperWidths { get; } = ["58 mm", "80 mm"];
+    public IReadOnlyList<string> InventorySortOptions { get; } = ["商品名（昇順）", "商品名（降順）", "期限が近い順", "数量が少ない順", "数量が多い順"];
 
     public ICommand LoginCommand { get; }
     public ICommand RegisterCommand { get; }
     public ICommand LogoutCommand { get; }
     public ICommand SimulateScanCommand { get; }
     public ICommand RefreshCommand { get; }
+    public ICommand ReloadInventoryCommand { get; }
     public ICommand SaveProductCommand { get; }
     public ICommand EditProductCommand { get; }
     public ICommand CancelProductEditCommand { get; }
@@ -137,6 +141,7 @@ public sealed class MainViewModel : ObservableObject
     public string SimulatedBarcode { get => _simulatedBarcode; set => SetProperty(ref _simulatedBarcode, value); }
     public string ProductSearch { get => _productSearch; set { if (SetProperty(ref _productSearch, value)) ApplyProductFilter(); } }
     public string InventoryFilter { get => _inventoryFilter; set { if (SetProperty(ref _inventoryFilter, value)) ApplyInventoryFilter(); } }
+    public int SelectedInventorySortIndex { get => _selectedInventorySortIndex; set => SetProperty(ref _selectedInventorySortIndex, value); }
     public string ProductName { get => _productName; set => SetProperty(ref _productName, value); }
     public string ProductBarcode { get => _productBarcode; set => SetProperty(ref _productBarcode, value); }
     public string ProductUnit { get => _productUnit; set => SetProperty(ref _productUnit, value); }
@@ -558,12 +563,20 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task LoadInventoryAsync(CancellationToken cancellationToken)
     {
-        _inventory = await _apiClient.GetInventoryAsync(cancellationToken);
+        var (sortBy, sortOrder) = SelectedInventorySortIndex switch
+        {
+            1 => ("name", "desc"),
+            2 => ("expiration", "asc"),
+            3 => ("quantity", "asc"),
+            4 => ("quantity", "desc"),
+            _ => ("name", "asc")
+        };
+        _inventory = await _apiClient.GetInventoryAsync(InventoryFilter, sortBy, sortOrder, DisplayLimits.MaximumRecords, cancellationToken);
         ApplyInventoryFilter();
-        Replace(ExpiringInventory, _inventory.Where(item => item.ExpiresOn.HasValue && item.ExpiresOn.Value <= DateOnly.FromDateTime(DateTime.Today.AddDays(7))).OrderBy(item => item.ExpiresOn));
+        Replace(ExpiringInventory, DisplayLimits.Apply(_inventory.Where(item => item.ExpiresOn.HasValue && item.ExpiresOn.Value <= DateOnly.FromDateTime(DateTime.Today.AddDays(7))).OrderBy(item => item.ExpiresOn)));
     }
 
-    private async Task LoadShoppingAsync(CancellationToken cancellationToken) => Replace(ShoppingItems, (await _apiClient.GetShoppingListAsync(cancellationToken)).Items);
+    private async Task LoadShoppingAsync(CancellationToken cancellationToken) => Replace(ShoppingItems, DisplayLimits.Apply((await _apiClient.GetShoppingListAsync(cancellationToken)).Items));
 
     private async Task LoadDashboardAsync(CancellationToken cancellationToken)
     {
@@ -580,8 +593,8 @@ public sealed class MainViewModel : ObservableObject
         await LoadDashboardAsync(cancellationToken);
     }
 
-    private void ApplyProductFilter() => Replace(VisibleProducts, string.IsNullOrWhiteSpace(ProductSearch) ? _products : _products.Where(product => product.Name.Contains(ProductSearch.Trim(), StringComparison.CurrentCultureIgnoreCase) || (product.Barcode?.Contains(ProductSearch.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)));
-    private void ApplyInventoryFilter() => Replace(VisibleInventory, string.IsNullOrWhiteSpace(InventoryFilter) ? _inventory : _inventory.Where(lot => lot.ProductName.Contains(InventoryFilter.Trim(), StringComparison.CurrentCultureIgnoreCase) || (lot.Barcode?.Contains(InventoryFilter.Trim(), StringComparison.OrdinalIgnoreCase) ?? false) || lot.LocationName.Contains(InventoryFilter.Trim(), StringComparison.CurrentCultureIgnoreCase)));
+    private void ApplyProductFilter() => Replace(VisibleProducts, DisplayLimits.Apply(string.IsNullOrWhiteSpace(ProductSearch) ? _products : _products.Where(product => product.Name.Contains(ProductSearch.Trim(), StringComparison.CurrentCultureIgnoreCase) || (product.Barcode?.Contains(ProductSearch.Trim(), StringComparison.OrdinalIgnoreCase) ?? false))));
+    private void ApplyInventoryFilter() => Replace(VisibleInventory, DisplayLimits.Apply(string.IsNullOrWhiteSpace(InventoryFilter) ? _inventory : _inventory.Where(lot => lot.ProductName.Contains(InventoryFilter.Trim(), StringComparison.CurrentCultureIgnoreCase) || (lot.Barcode?.Contains(InventoryFilter.Trim(), StringComparison.OrdinalIgnoreCase) ?? false) || lot.LocationName.Contains(InventoryFilter.Trim(), StringComparison.CurrentCultureIgnoreCase))));
 
     private void ClearProductEditor()
     {

@@ -50,6 +50,9 @@ app.MapControllers();
 if (builder.Configuration.GetValue("Database:AutoMigrate", false))
     await MigrateDatabaseAsync(app.Services, app.Logger, migrationAttempts);
 
+if (app.Environment.IsDevelopment() && builder.Configuration.GetValue("Database:SeedDevelopmentData", false))
+    await SeedDevelopmentDataAsync(app.Services);
+
 app.Run();
 
 /// <summary>
@@ -79,6 +82,17 @@ static async Task MigrateDatabaseAsync(IServiceProvider services, ILogger logger
             await Task.Delay(TimeSpan.FromSeconds(2));
         }
     }
+}
+
+/// <summary>
+/// 明示的に有効化された開発環境だけへ、画面確認用データを投入します。
+/// </summary>
+static async Task SeedDevelopmentDataAsync(IServiceProvider services)
+{
+    await using var scope = services.CreateAsyncScope();
+    var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var timeProvider = scope.ServiceProvider.GetRequiredService<TimeProvider>();
+    await DevelopmentDataSeeder.SeedAsync(database, timeProvider);
 }
 
 public partial class Program;

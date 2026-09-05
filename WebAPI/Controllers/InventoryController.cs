@@ -18,6 +18,9 @@ namespace InventoryAPI.Controllers;
 [Route("api/inventory")]
 public sealed class InventoryController(ApplicationDbContext db, InventoryService inventoryService) : ControllerBase
 {
+    public const int DefaultLimit = 20;
+    public const int MaximumLimit = 100;
+
     /// <summary>
     /// 在庫一覧取得
     /// </summary>
@@ -31,7 +34,11 @@ public sealed class InventoryController(ApplicationDbContext db, InventoryServic
         [FromQuery] Guid? productId,
         [FromQuery] Guid? locationId,
         [FromQuery] DateOnly? expiringBefore,
-        CancellationToken cancellationToken)
+        [FromQuery] string? query,
+        [FromQuery] string sortBy = "name",
+        [FromQuery] string sortOrder = "asc",
+        [FromQuery] int limit = DefaultLimit,
+        CancellationToken cancellationToken = default)
     {
         var lots = db.StockLots.AsNoTracking()
             .Where(x => x.HouseholdId == SystemDefaults.HouseholdId && x.CurrentQuantity > 0);
@@ -42,14 +49,58 @@ public sealed class InventoryController(ApplicationDbContext db, InventoryServic
         if (expiringBefore.HasValue)
             lots = lots.Where(x => x.ExpiresOn != null && x.ExpiresOn <= expiringBefore.Value);
 
-        return await (
+        var rows =
             from lot in lots
             join product in db.Products.AsNoTracking() on lot.ProductId equals product.Id
             join location in db.Locations.AsNoTracking() on lot.LocationId equals location.Id
-            orderby product.Name, lot.ExpiresOn == null, lot.ExpiresOn
-            select new InventoryLotResponse(
-                lot.Id, product.Id, product.Name, product.Barcode, product.Unit,
-                location.Id, location.Name, lot.ExpiresOn, lot.CurrentQuantity))
+            select new
+            {
+                LotId = lot.Id,
+                ProductId = product.Id,
+                ProductName = product.Name,
+                product.Barcode,
+                product.Unit,
+                LocationId = location.Id,
+                LocationName = location.Name,
+                lot.ExpiresOn,
+                Quantity = lot.CurrentQuantity
+            };
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var search = query.Trim();
+            rows = rows.Where(row =>
+                EF.Functions.ILike(row.ProductName, $"%{search}%") ||
+                (row.Barcode != null && row.Barcode.Contains(search)) ||
+                EF.Functions.ILike(row.LocationName, $"%{search}%"));
+        }
+
+        var isDescending = string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase);
+        var orderedRows = sortBy.ToLowerInvariant() switch
+        {
+            "expiration" => isDescending
+                ? rows.OrderByDescending(row => row.ExpiresOn.HasValue).ThenByDescending(row => row.ExpiresOn).ThenBy(row => row.ProductName)
+                : rows.OrderBy(row => !row.ExpiresOn.HasValue).ThenBy(row => row.ExpiresOn).ThenBy(row => row.ProductName),
+            "quantity" => isDescending
+                ? rows.OrderByDescending(row => (double)row.Quantity).ThenBy(row => row.ProductName)
+                : rows.OrderBy(row => (double)row.Quantity).ThenBy(row => row.ProductName),
+            _ => isDescending
+                ? rows.OrderByDescending(row => row.ProductName).ThenBy(row => row.ExpiresOn)
+                : rows.OrderBy(row => row.ProductName).ThenBy(row => row.ExpiresOn)
+        };
+
+        return await orderedRows
+            .Take(Math.Clamp(limit, 1, MaximumLimit))
+            .Select(row => new InventoryLotResponse(
+                row.LotId,
+                row.ProductId,
+                row.ProductName,
+                row.Barcode,
+                row.Unit,
+                row.LocationId,
+                row.LocationName,
+                row.ExpiresOn,
+                row.Quantity))
             .ToListAsync(cancellationToken);
     }
 

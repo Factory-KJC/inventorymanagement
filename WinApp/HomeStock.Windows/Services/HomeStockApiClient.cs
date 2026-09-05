@@ -112,8 +112,15 @@ public sealed class HomeStockApiClient(HttpClient httpClient, ICredentialStore c
     public Task<LocationResponse> RestoreLocationAsync(Guid locationId, UpdateLocationRequest request, CancellationToken cancellationToken) =>
         PostAsync<UpdateLocationRequest, LocationResponse>($"api/locations/{locationId}/restore", request, cancellationToken);
 
-    public Task<IReadOnlyList<InventoryLotResponse>> GetInventoryAsync(CancellationToken cancellationToken) =>
-        GetAsync<IReadOnlyList<InventoryLotResponse>>("api/inventory", cancellationToken);
+    public Task<IReadOnlyList<InventoryLotResponse>> GetInventoryAsync(
+        string? query,
+        string sortBy,
+        string sortOrder,
+        int limit,
+        CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<InventoryLotResponse>>(
+            $"api/inventory?query={Uri.EscapeDataString(query ?? string.Empty)}&sortBy={Uri.EscapeDataString(sortBy)}&sortOrder={Uri.EscapeDataString(sortOrder)}&limit={limit}",
+            cancellationToken);
 
     public Task<ShoppingListResponse> GetShoppingListAsync(CancellationToken cancellationToken) =>
         GetAsync<ShoppingListResponse>("api/shopping-lists/current", cancellationToken);

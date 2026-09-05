@@ -42,6 +42,14 @@ Swaggerは開発環境の`/swagger`で確認できます。具体的なリクエ
 
 ## 在庫コマンド
 
+在庫一覧は、必要な行だけをDBから取得するため次のクエリを使用します。
+
+```http
+GET /api/inventory?query=洗剤&sortBy=expiration&sortOrder=asc&limit=20
+```
+
+`query`は商品名、JANコード、保管場所を検索します。`sortBy`は`name`、`expiration`、`quantity`、`sortOrder`は`asc`または`desc`を指定できます。`limit`の既定値は20、最大値は100です。絞り込み、並び替え、件数制限はDB上で実行されます。
+
 `POST /api/inventory/receive`、`consume`、`discard`、`adjust`には`Idempotency-Key`ヘッダーが必須です。クライアントで操作ごとにUUIDを生成し、通信失敗時は同じキーで再送してください。別操作には同じキーを再利用しません。
 
 ```http
