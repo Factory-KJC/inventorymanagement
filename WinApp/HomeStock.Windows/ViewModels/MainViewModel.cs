@@ -43,6 +43,8 @@ public sealed class MainViewModel : ObservableObject
     private string _countedQuantity = string.Empty;
     private string _shoppingName = string.Empty;
     private string _shoppingQuantity = "1";
+    private int _selectedPrintPaperWidthIndex = 1;
+    private string _printPreview = "プレビューを表示すると、ここに印刷内容が表示されます。";
     private ProductResponse? _selectedProduct;
     private LocationResponse? _selectedLocation;
     private LocationResponse? _selectedScanLocation;
@@ -90,6 +92,8 @@ public sealed class MainViewModel : ObservableObject
         AddShoppingItemCommand = new AsyncRelayCommand(AddShoppingItemAsync);
         GenerateShoppingCommand = new AsyncRelayCommand(GenerateShoppingAsync);
         ToggleShoppingItemCommand = new AsyncRelayCommand(ToggleShoppingItemAsync);
+        PreviewShoppingListCommand = new AsyncRelayCommand(PreviewShoppingListAsync);
+        PrintShoppingListCommand = new AsyncRelayCommand(PrintShoppingListAsync);
     }
 
     public IReadOnlyList<string> Sections => SectionNames;
@@ -99,6 +103,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<InventoryLotResponse> ExpiringInventory { get; } = [];
     public ObservableCollection<ShoppingItemResponse> ShoppingItems { get; } = [];
     public ObservableCollection<string> ScanHistory { get; } = [];
+    public IReadOnlyList<string> PrintPaperWidths { get; } = ["58 mm", "80 mm"];
 
     public ICommand LoginCommand { get; }
     public ICommand RegisterCommand { get; }
@@ -120,6 +125,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand AddShoppingItemCommand { get; }
     public ICommand GenerateShoppingCommand { get; }
     public ICommand ToggleShoppingItemCommand { get; }
+    public ICommand PreviewShoppingListCommand { get; }
+    public ICommand PrintShoppingListCommand { get; }
 
     public string ApiUrl { get => _apiUrl; set => SetProperty(ref _apiUrl, value); }
     public string Username { get => _username; set => SetProperty(ref _username, value); }
@@ -143,6 +150,18 @@ public sealed class MainViewModel : ObservableObject
     public string CountedQuantity { get => _countedQuantity; set => SetProperty(ref _countedQuantity, value); }
     public string ShoppingName { get => _shoppingName; set => SetProperty(ref _shoppingName, value); }
     public string ShoppingQuantity { get => _shoppingQuantity; set => SetProperty(ref _shoppingQuantity, value); }
+    public int SelectedPrintPaperWidthIndex
+    {
+        get => _selectedPrintPaperWidthIndex;
+        set
+        {
+            if (SetProperty(ref _selectedPrintPaperWidthIndex, value))
+            {
+                PrintPreview = "用紙幅を変更しました。プレビューを更新してください。";
+            }
+        }
+    }
+    public string PrintPreview { get => _printPreview; private set => SetProperty(ref _printPreview, value); }
     public ProductResponse? SelectedProduct { get => _selectedProduct; set => SetProperty(ref _selectedProduct, value); }
     public LocationResponse? SelectedLocation { get => _selectedLocation; set => SetProperty(ref _selectedLocation, value); }
     public LocationResponse? SelectedScanLocation { get => _selectedScanLocation; set => SetProperty(ref _selectedScanLocation, value); }
@@ -490,6 +509,29 @@ public sealed class MainViewModel : ObservableObject
         Status = "購入状態を更新しました。";
     });
 
+    private async Task PreviewShoppingListAsync() => await RunUiActionAsync(async cancellationToken =>
+    {
+        var paperWidth = SelectedPrintPaperWidthIndex == 0 ? PrintPaperWidth.Mm58 : PrintPaperWidth.Mm80;
+        var preview = await _apiClient.GetPrintPreviewAsync(paperWidth, cancellationToken);
+        PrintPreview = ReceiptPreviewFormatter.Format(preview.ReceiptLine, preview.PaperWidth);
+        Status = $"{PrintPaperWidths[SelectedPrintPaperWidthIndex]}の印刷プレビューを更新しました。";
+    });
+
+    private async Task PrintShoppingListAsync() => await RunUiActionAsync(async cancellationToken =>
+    {
+        var paperWidth = SelectedPrintPaperWidthIndex == 0 ? PrintPaperWidth.Mm58 : PrintPaperWidth.Mm80;
+        var preview = await _apiClient.GetPrintPreviewAsync(paperWidth, cancellationToken);
+        PrintPreview = ReceiptPreviewFormatter.Format(preview.ReceiptLine, preview.PaperWidth);
+        if (!await _userInteraction.ConfirmAsync("買い物リストの印刷", "表示中の内容を印刷しますか？", "印刷", "キャンセル"))
+        {
+            Status = "印刷をキャンセルしました。";
+            return;
+        }
+
+        var job = await _apiClient.CreatePrintJobAsync(paperWidth, cancellationToken);
+        Status = $"印刷ジョブを受け付けました（{job.Id}）。";
+    });
+
     private async Task LoadReferenceDataAsync(CancellationToken cancellationToken)
     {
         await LoadProductsAsync(cancellationToken);
@@ -569,6 +611,7 @@ public sealed class MainViewModel : ObservableObject
         VisibleInventory.Clear();
         ExpiringInventory.Clear();
         ShoppingItems.Clear();
+        PrintPreview = "プレビューを表示すると、ここに印刷内容が表示されます。";
         ProductCount = LowStockCount = ExpiringCount = ShoppingCount = 0;
     }
 

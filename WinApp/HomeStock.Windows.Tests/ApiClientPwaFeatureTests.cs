@@ -23,6 +23,8 @@ public sealed class ApiClientPwaFeatureTests
             Guid.Parse("33333333-3333-3333-3333-333333333333"),
             new UpdateShoppingItemRequest(null, ShoppingItemStatus.Purchased),
             CancellationToken.None);
+        var preview = await client.GetPrintPreviewAsync(PrintPaperWidth.Mm80, CancellationToken.None);
+        var printJob = await client.CreatePrintJobAsync(PrintPaperWidth.Mm80, CancellationToken.None);
         await client.ConsumeAsync(
             new ConsumeStockRequest(Guid.NewGuid(), 1, null, "test"),
             "consume-key",
@@ -30,9 +32,12 @@ public sealed class ApiClientPwaFeatureTests
 
         Assert.Equal(4, dashboard.ProductCount);
         Assert.Equal(ShoppingItemStatus.Purchased, shopping.Items[0].Status);
+        Assert.Contains("買い物リスト", preview.ReceiptLine);
+        Assert.Equal(PrintJobStatus.Pending, printJob.Status);
         Assert.All(handler.AuthorizedRequests, request => Assert.Equal("Bearer access", request.Authorization));
         Assert.Contains(handler.AuthorizedRequests, request => request.Method == "PATCH" && request.Body.Contains("\"status\":\"Purchased\""));
         Assert.Contains(handler.AuthorizedRequests, request => request.Path == "/api/inventory/consume" && request.IdempotencyKey == "consume-key");
+        Assert.Contains(handler.AuthorizedRequests, request => request.Path == "/api/shopping-lists/current/print-jobs" && request.Body.Contains("\"paperWidth\":\"Mm80\""));
     }
 
     [Fact]
@@ -111,6 +116,8 @@ public sealed class ApiClientPwaFeatureTests
                 "/api/shopping-lists/current/items" => Json(ShoppingJson),
                 "/api/shopping-lists/current/generate" => Json(ShoppingJson),
                 "/api/shopping-lists/current/items/33333333-3333-3333-3333-333333333333" => Json(ShoppingJson),
+                "/api/shopping-lists/current/print-preview" => Json("{\"paperWidth\":\"Mm80\",\"receiptLine\":\"-\\n^^^買い物リスト^^^\\n-\"}"),
+                "/api/shopping-lists/current/print-jobs" => Json("{\"id\":\"44444444-4444-4444-4444-444444444444\",\"shoppingListId\":\"22222222-2222-2222-2222-222222222222\",\"paperWidth\":\"Mm80\",\"receiptLine\":\"preview\",\"status\":\"Pending\",\"attemptCount\":0,\"lastError\":null,\"createdAt\":\"2026-08-30T00:00:00Z\",\"startedAt\":null,\"completedAt\":null}"),
                 "/api/inventory/consume" => Json("{}"),
                 _ => throw new InvalidOperationException($"Unexpected path: {path}"),
             };

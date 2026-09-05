@@ -9,7 +9,7 @@ RUN dotnet publish WebAPI/InventoryAPI.csproj --configuration Release --output /
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim AS final
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends curl \
+    && apt-get install --yes --no-install-recommends curl tzdata \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build --chown=app:app /app/publish .
 USER app

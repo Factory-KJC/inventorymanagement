@@ -127,6 +127,15 @@ public sealed class HomeStockApiClient(HttpClient httpClient, ICredentialStore c
     public Task<ShoppingListResponse> UpdateShoppingItemAsync(Guid itemId, UpdateShoppingItemRequest request, CancellationToken cancellationToken) =>
         SendWithResponseAsync<UpdateShoppingItemRequest, ShoppingListResponse>(HttpMethod.Patch, $"api/shopping-lists/current/items/{itemId}", request, cancellationToken);
 
+    public Task<PrintPreviewResponse> GetPrintPreviewAsync(PrintPaperWidth paperWidth, CancellationToken cancellationToken) =>
+        GetAsync<PrintPreviewResponse>($"api/shopping-lists/current/print-preview?paperWidth={paperWidth}", cancellationToken);
+
+    public Task<PrintJobResponse> CreatePrintJobAsync(PrintPaperWidth paperWidth, CancellationToken cancellationToken) =>
+        PostAsync<CreatePrintJobRequest, PrintJobResponse>(
+            "api/shopping-lists/current/print-jobs",
+            new CreatePrintJobRequest(paperWidth),
+            cancellationToken);
+
     public Task ReceiveAsync(ReceiveStockRequest request, string idempotencyKey, CancellationToken cancellationToken) =>
         SendAsync(HttpMethod.Post, "api/inventory/receive", request, idempotencyKey, cancellationToken);
 

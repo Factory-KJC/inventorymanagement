@@ -8,6 +8,7 @@ services:
     image: home-stock-api:${IMAGE_TAG:-local}
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-Asia/Tokyo}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-homestock};Username=${POSTGRES_USER:-homestock};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       Jwt__Issuer: ${JWT_ISSUER:-home-stock}

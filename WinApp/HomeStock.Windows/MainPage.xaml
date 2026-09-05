@@ -106,13 +106,32 @@
                   </HorizontalStackLayout>
       </Grid>
 
-      <Grid IsVisible="{Binding IsSection4Visible}" RowDefinitions="Auto,Auto,*" RowSpacing="8">
+      <Grid IsVisible="{Binding IsSection4Visible}" RowDefinitions="Auto,Auto,*" ColumnDefinitions="3*,2*" RowSpacing="8" ColumnSpacing="16">
         <Label Style="{StaticResource SectionTitle}" Text="買い物リスト" />
         <HorizontalStackLayout Grid.Row="1" Spacing="8"><Entry WidthRequest="220" Placeholder="品名" Text="{Binding ShoppingName}" /><Entry WidthRequest="80" Keyboard="Numeric" Text="{Binding ShoppingQuantity}" /><Button Command="{Binding AddShoppingItemCommand}" Text="追加" /><Button Command="{Binding GenerateShoppingCommand}" Text="不足品を提案" /><Button Command="{Binding ToggleShoppingItemCommand}" Text="購入／未購入を切替" /></HorizontalStackLayout>
         <CollectionView Grid.Row="2" ItemsSource="{Binding ShoppingItems}" SelectedItem="{Binding SelectedShoppingItem}" SelectionMode="Single">
           <CollectionView.Header><Grid Style="{StaticResource TableHeader}" Padding="8" ColumnDefinitions="2*,*,*,*"><Label Text="品名" /><Label Grid.Column="1" Text="数量" /><Label Grid.Column="2" Text="追加元" /><Label Grid.Column="3" Text="状態" /></Grid></CollectionView.Header>
           <CollectionView.ItemTemplate><DataTemplate><Grid Padding="8" ColumnDefinitions="2*,*,*,*"><Label Text="{Binding Name}" /><Label Grid.Column="1" Text="{Binding Quantity}" /><Label Grid.Column="2" Text="{Binding Source}" /><Label Grid.Column="3" Text="{Binding Status}" /></Grid></DataTemplate></CollectionView.ItemTemplate>
         </CollectionView>
+        <Border Grid.RowSpan="3" Grid.Column="1" Padding="12" StrokeShape="RoundRectangle 8">
+          <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
+            <Label Style="{StaticResource SectionTitle}" Text="印刷プレビュー" />
+            <HorizontalStackLayout Grid.Row="1" Spacing="8">
+              <Label Text="用紙幅" VerticalOptions="Center" />
+              <Picker WidthRequest="100" ItemsSource="{Binding PrintPaperWidths}" SelectedIndex="{Binding SelectedPrintPaperWidthIndex}" />
+              <Button Command="{Binding PreviewShoppingListCommand}" Text="更新" />
+              <Button Command="{Binding PrintShoppingListCommand}" Text="印刷" />
+            </HorizontalStackLayout>
+            <Editor
+                Grid.Row="2"
+                FontFamily="Consolas"
+                FontSize="16"
+                HorizontalTextAlignment="Start"
+                IsReadOnly="True"
+                Text="{Binding PrintPreview}"
+                VerticalOptions="FillAndExpand" />
+          </Grid>
+        </Border>
       </Grid>
 
       <Grid IsVisible="{Binding IsSection5Visible}" ColumnDefinitions="2*,*" ColumnSpacing="16">

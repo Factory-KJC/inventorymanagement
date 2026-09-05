@@ -16,6 +16,32 @@ public sealed class PrintJobService(ApplicationDbContext db, TimeProvider timePr
 
     public async Task<PrintJobResponse?> CreateAsync(PrintPaperWidth width, CancellationToken cancellationToken)
     {
+        var snapshot = await BuildSnapshotAsync(cancellationToken);
+        if (snapshot is null) return null;
+        var now = timeProvider.GetUtcNow();
+        var job = new PrintJob
+        {
+            Id = Guid.NewGuid(),
+            HouseholdId = SystemDefaults.HouseholdId,
+            ShoppingListId = snapshot.ShoppingListId,
+            PaperWidth = width,
+            ReceiptLine = snapshot.ReceiptLine,
+            Status = PrintJobStatus.Pending,
+            CreatedAt = now
+        };
+        db.PrintJobs.Add(job);
+        await db.SaveChangesAsync(cancellationToken);
+        return ToResponse(job);
+    }
+
+    public async Task<PrintPreviewResponse?> GetPreviewAsync(PrintPaperWidth width, CancellationToken cancellationToken)
+    {
+        var snapshot = await BuildSnapshotAsync(cancellationToken);
+        return snapshot is null ? null : new PrintPreviewResponse(width, snapshot.ReceiptLine);
+    }
+
+    private async Task<PrintSnapshot?> BuildSnapshotAsync(CancellationToken cancellationToken)
+    {
         var list = await db.ShoppingLists.Include(x => x.Items).SingleOrDefaultAsync(x =>
             x.HouseholdId == SystemDefaults.HouseholdId && x.Status == ShoppingListStatus.Active, cancellationToken);
         if (list is null) return null;
@@ -24,20 +50,8 @@ public sealed class PrintJobService(ApplicationDbContext db, TimeProvider timePr
         var productIds = pending.Where(x => x.ProductId.HasValue).Select(x => x.ProductId!.Value).Distinct().ToList();
         var units = await db.Products.AsNoTracking().Where(x => productIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.Unit, cancellationToken);
-        var now = timeProvider.GetUtcNow();
-        var job = new PrintJob
-        {
-            Id = Guid.NewGuid(),
-            HouseholdId = SystemDefaults.HouseholdId,
-            ShoppingListId = list.Id,
-            PaperWidth = width,
-            ReceiptLine = BuildDocument(pending, units, now),
-            Status = PrintJobStatus.Pending,
-            CreatedAt = now
-        };
-        db.PrintJobs.Add(job);
-        await db.SaveChangesAsync(cancellationToken);
-        return ToResponse(job);
+        var serverLocalNow = timeProvider.GetLocalNow();
+        return new PrintSnapshot(list.Id, BuildDocument(pending, units, serverLocalNow));
     }
 
     public async Task<PrintJobResponse?> GetAsync(Guid id, CancellationToken token) =>
@@ -72,7 +86,7 @@ public sealed class PrintJobService(ApplicationDbContext db, TimeProvider timePr
     {
         var japaneseCulture = CultureInfo.GetCultureInfo("ja-JP");
         var dayOfWeek = japaneseCulture.DateTimeFormat.GetAbbreviatedDayName(now.DayOfWeek);
-        var b = new StringBuilder("-\n^^^買い物リスト^^^\n-\n");
+        var b = new StringBuilder("^^^買い物リスト^^^\n-\n");
         b.Append(now.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture))
             .Append('（')
             .Append(dayOfWeek)
@@ -91,4 +105,5 @@ public sealed class PrintJobService(ApplicationDbContext db, TimeProvider timePr
 
     private static string Escape(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("|", "\\|", StringComparison.Ordinal).Replace("{", "\\{", StringComparison.Ordinal).Replace("^", "\\^", StringComparison.Ordinal);
     private static PrintJobResponse ToResponse(PrintJob x) => new(x.Id, x.ShoppingListId, x.PaperWidth, x.ReceiptLine, x.Status, x.AttemptCount, x.LastError, x.CreatedAt, x.StartedAt, x.CompletedAt);
+    private sealed record PrintSnapshot(Guid ShoppingListId, string ReceiptLine);
 }

@@ -188,7 +188,7 @@ APIのMVP不足は解消済みです。Windowsクライアントからの印刷�
 
 - 印刷ジョブと同一receiptlineスナップショットを使う再印刷API（基盤実装済み）
 - 58/80mm用テキスト・PDFプレビュー
-- Linux Print Workerとreceiptlineによる非画像ESC/POS送信（基盤実装済み、実機検証待ち）
+- Linux Print Workerとreceiptlineによる非画像ESC/POS送信、およびSSEによる即時ジョブ通知（基盤実装済み、実機検証待ち）
 - 日本語、改行、紙切れ、通信断からの復帰試験
 - 監視、バックアップ、ログローテーション
 - 旧試作データの一度限りの移行

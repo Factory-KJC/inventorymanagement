@@ -68,6 +68,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ShoppingListService>();
         services.AddScoped<ShoppingReceiptService>();
         services.AddScoped<PrintJobService>();
+        services.AddSingleton<PrintJobNotifier>();
         services.AddScoped<JwtTokenService>();
         services.AddSingleton(TimeProvider.System);
 

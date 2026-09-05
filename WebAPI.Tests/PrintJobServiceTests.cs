@@ -33,16 +33,47 @@ public sealed class PrintJobServiceTests
             ]
         });
         await db.SaveChangesAsync();
-        var service = new PrintJobService(db, new FixedTimeProvider(now));
+        var service = new PrintJobService(
+            db,
+            new FixedTimeProvider(now, TimeZoneInfo.CreateCustomTimeZone("Server time", TimeSpan.FromHours(9), "Server time", "Server time")));
 
         var result = await service.CreateAsync(PrintPaperWidth.Mm80, default);
 
         Assert.NotNull(result);
         Assert.Equal(PrintJobStatus.Pending, result.Status);
         Assert.Equal(
-            "^^^買い物リスト^^^\n-\n2026/08/30（日） 01:02\n-\n洗剤 | 2\n-\n^Home Stock^",
+            "^^^買い物リスト^^^\n-\n2026/08/30（日） 10:02\n-\n洗剤 | 2\n-\n^Home Stock^",
             result.ReceiptLine);
         Assert.Equal(result.ReceiptLine, (await db.PrintJobs.SingleAsync()).ReceiptLine);
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_DoesNotCreatePrintJob()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var now = DateTimeOffset.Parse("2026-08-30T00:00:00Z");
+        var listId = Guid.NewGuid();
+        db.ShoppingLists.Add(new ShoppingList
+        {
+            Id = listId,
+            HouseholdId = SystemDefaults.HouseholdId,
+            Status = ShoppingListStatus.Active,
+            CreatedAt = now,
+            Items = [Item(listId, "洗剤", ShoppingItemStatus.Pending, now)]
+        });
+        await db.SaveChangesAsync();
+        var service = new PrintJobService(db, new FixedTimeProvider(now));
+
+        var result = await service.GetPreviewAsync(PrintPaperWidth.Mm58, default);
+
+        Assert.NotNull(result);
+        Assert.Equal(PrintPaperWidth.Mm58, result.PaperWidth);
+        Assert.Contains("洗剤", result.ReceiptLine);
+        Assert.Empty(db.PrintJobs);
     }
 
     [Fact]
@@ -121,8 +152,10 @@ public sealed class PrintJobServiceTests
         UpdatedAt = now
     };
 
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    private sealed class FixedTimeProvider(DateTimeOffset now, TimeZoneInfo? localTimeZone = null) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+
+        public override TimeZoneInfo LocalTimeZone { get; } = localTimeZone ?? TimeZoneInfo.Utc;
     }
 }

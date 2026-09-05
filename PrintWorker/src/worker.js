@@ -1,40 +1,52 @@
 import net from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { toEscPos } from './receipt.js';
+import { parseServerSentEvents } from './sse-events.js';
 
 const settings = {
   apiUrl: required('PRINT_API_URL').replace(/\/$/, ''),
   apiKey: required('PRINT_WORKER_API_KEY'),
   printerHost: required('PRINTER_HOST'),
   printerPort: Number(process.env.PRINTER_PORT ?? '9100'),
-  pollMilliseconds: Number(process.env.POLL_MILLISECONDS ?? '2000'),
+  reconnectMilliseconds: Number(process.env.RECONNECT_MILLISECONDS ?? '2000'),
   timeoutMilliseconds: Number(process.env.PRINTER_TIMEOUT_MILLISECONDS ?? '10000')
 };
 
 while (true) {
   try {
-    const job = await claim();
-    if (!job) {
-      await delay(settings.pollMilliseconds);
-      continue;
+    for await (const _ of jobEvents()) {
+      await drainQueue();
     }
+  } catch (error) {
+    console.error(error);
+    await delay(settings.reconnectMilliseconds);
+  }
+}
+
+async function drainQueue() {
+  let job;
+  while ((job = await claim()) !== null) {
     try {
       logReceiptLine(job);
       const command = toEscPos(job.receiptLine, job.paperWidth);
-      console.info(JSON.stringify({
-        event: 'escpos-generated',
-        printJobId: job.id,
-        byteLength: command.length
-      }));
+      console.info(JSON.stringify({ event: 'escpos-generated', printJobId: job.id, byteLength: command.length }));
       await send(command);
       await complete(job.id);
     } catch (error) {
       await complete(job.id, error instanceof Error ? error.message : String(error));
     }
-  } catch (error) {
-    console.error(error);
-    await delay(settings.pollMilliseconds);
   }
+}
+
+async function* jobEvents() {
+  const response = await fetch(`${settings.apiUrl}/api/print-jobs/worker/events`, { headers: headers() });
+  if (!response.ok) throw new Error(`Event connection failed: HTTP ${response.status}`);
+  if (!response.body) throw new Error('Event connection returned no response body.');
+
+  for await (const event of parseServerSentEvents(response.body)) {
+    if (event.includes('event: print-job')) yield true;
+  }
+  throw new Error('Event connection closed.');
 }
 
 async function claim() {

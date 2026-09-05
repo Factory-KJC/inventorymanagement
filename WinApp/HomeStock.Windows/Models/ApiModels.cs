@@ -44,6 +44,34 @@ public sealed record ShoppingItemResponse(Guid Id, Guid? ProductId, string Name,
 public sealed record AddShoppingItemRequest(Guid? ProductId, string Name, decimal Quantity);
 public sealed record UpdateShoppingItemRequest(decimal? Quantity, ShoppingItemStatus? Status);
 
+public enum PrintPaperWidth
+{
+    Mm58 = 58,
+    Mm80 = 80,
+}
+
+public enum PrintJobStatus
+{
+    Pending = 1,
+    Processing = 2,
+    Succeeded = 3,
+    Failed = 4,
+}
+
+public sealed record CreatePrintJobRequest(PrintPaperWidth PaperWidth);
+public sealed record PrintPreviewResponse(PrintPaperWidth PaperWidth, string ReceiptLine);
+public sealed record PrintJobResponse(
+    Guid Id,
+    Guid ShoppingListId,
+    PrintPaperWidth PaperWidth,
+    string ReceiptLine,
+    PrintJobStatus Status,
+    int AttemptCount,
+    string? LastError,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? CompletedAt);
+
 public sealed record StoredSession(Uri ApiBaseUri, string Username, string RefreshToken);
 
 public sealed record ScanResult(string Barcode, bool IsSuccess, string Message)

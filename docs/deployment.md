@@ -62,12 +62,15 @@ pgAdmin 4で「Register」→「Server」を選び、次の値を入力します
 
 ```dotenv
 ASPNETCORE_ENVIRONMENT=Production
+TZ=Asia/Tokyo
 POSTGRES_PASSWORD=<十分に長いランダム値>
 JWT_KEY=<32バイト以上のランダム値>
 SETUP_TOKEN=<JWT_KEYとは異なる十分に長いランダム値>
 PUBLIC_HOST=stock.example.com
 WEB_ORIGIN=https://stock.example.com
 ```
+
+`TZ`はレシートへ印字する日時のタイムゾーンです。変更後はAPIコンテナを再作成してください。
 
 秘密値は次のように生成できます。
 

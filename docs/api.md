@@ -110,6 +110,8 @@ Print Worker用エンドポイントは`X-Print-Worker-Key`で保護されます
 
 Workerは印刷直前に`receiptline-preview`イベントとして、ジョブID、用紙幅、receiptline文書をJSONログへ出力します。この文書は外部のReceiptLine Designerへ貼り付けてプレビューできます。ESC/POSバイナリはログへ記録しません。
 
+Workerは`GET /api/print-jobs/worker/events`のSSE通知を待ち、接続時と`print-job`イベント受信時だけ`worker/claim`を呼び出します。定期ポーリングは行いません。SSE接続が切断された場合は再接続し、接続直後の通知で停止中に作成されたジョブも取得します。
+
 ## JANコード
 
 JANコードは先頭ゼロを保持するため文字列で送ります。8桁または13桁とチェックディジットを検証します。JANコードを持たない商品は`barcode`を省略できます。同一世帯内では一意です。
