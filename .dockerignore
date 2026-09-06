@@ -1,0 +1,12 @@
+.git
+.vs
+.idea
+**/bin
+**/obj
+**/packages
+WinApp
+docs
+*.user
+*.suo
+.env
+compose*.yaml

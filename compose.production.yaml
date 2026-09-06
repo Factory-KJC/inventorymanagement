@@ -1,0 +1,8 @@
+services:
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__AutoMigrate: "true"
+      ReverseProxy__KnownProxies__0: ${REVERSE_PROXY_IP:?set REVERSE_PROXY_IP in .env}
+    ports: !override
+      - "${API_BIND_ADDRESS:?set API_BIND_ADDRESS in .env}:${API_PORT:-8080}:8080"

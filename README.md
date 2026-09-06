@@ -1,29 +1,52 @@
-# Inventory Management
+# Home Stock
 
-## 概要
-物品在庫管理システム
+自宅の日用品・食料品を「いま何があるか」ではなく、**次に何を買うべきか**まで管理する家庭向け在庫システムです。
 
-## 使用技術一覧
+## プロダクトのゴール
 
-### データベース
+- 二重購入と買い忘れを減らす
+- 在庫不足、期限間近、期限切れをすぐ把握できる
+- スマートフォンで日常の入出庫と買い物を完結できる
+- Windowsではバーコードスキャナによる連続登録とサーマル印刷を行える
+- 在庫変更の履歴を残し、誤操作を後から訂正できる
 
-<p style="display: inline">
-    <img src="https://shields.io/badge/MySQL-lightgrey.svg?logo=mysql&logoColor=white&labelColor=blue">
-</p>
+## 再構築方針
 
-### API
+現行実装では、商品行の数量を直接書き換える方式を廃止し、次の4概念を中心に設計しています。
 
-<p style="display: inline">
-    <img src="https://img.shields.io/badge/ASP.NET-8-%23512BD4.svg?logo=.net">
-    <img src="https://img.shields.io/badge/C%23-512BD4.svg?logo=csharp">
-</p>
+1. `Product` — 商品マスタ（名称、JANコード、補充基準）
+2. `StockLot` — 保管場所・期限・数量を持つ実在庫
+3. `StockMovement` — 入庫、消費、廃棄、棚卸、移動の履歴
+4. `ShoppingListItem` — 自動提案と手動追加を統合した買い物項目
 
-### Windows用アプリケーション
-<p style="display: inline">
-    <img src="https://img.shields.io/badge/.NET Framework-4.7.2-%23512BD4.svg">
-    <img src="https://img.shields.io/badge/WPF-%23512BD4.svg?logo=.net">
-    <img src="https://img.shields.io/badge/C%23-512BD4.svg?logo=csharp">
-    <img src="https://img.shields.io/badge/OPOS_for_,NET-1.14-512BD4.svg">
-    <img src="https://img.shields.io/badge/EPSON_OPOS_ADK-512BD4.svg?logo=epson">
-</p>
+全体方針は [プロダクト構想](docs/product-concept.md)、技術構成は [アーキテクチャ](docs/architecture.md)、現在地と次作業は [実装状況](docs/implementation-status.md)、実装順は [ロードマップ](docs/roadmap.md) を参照してください。
 
+APIはLinuxコンテナとして構築し、Windows開発環境とDebian本番環境で同じイメージを使用します。起動方法は[Docker開発・Debian配備](docs/deployment.md)、APIの現在の機能は[API利用ガイド](docs/api.md)を参照してください。
+
+スマートフォンPWAはAPIのルートURL（開発環境では`http://localhost:8080/`）から配信されます。
+
+Windowsクライアントは.NET 10 MAUI（WinUI 3）で `WinApp/HomeStock.Windows/` に実装しています。起動方法とスキャナ設定は[Windowsクライアント利用ガイド](docs/windows-client.md)を参照してください。
+
+## 構成
+
+```text
+スマートフォン PWA ─ HTTPS ─┐
+                            ├─ Linux / Web API ─ PostgreSQL
+Windows MAUI / WinUI 3 ─ HTTPS ─┘
+   └─ NetumScan NSL8BL（USB-HID）
+
+家庭内LAN ─ EPSON TM-T90II TM902UE211（有線LAN / 80mm）
+```
+
+## MVPの完了条件
+
+- JANコードまたは名称から商品を登録できる
+- 入庫・消費・廃棄・棚卸の履歴が残る
+- 保管場所別、期限別の在庫を確認できる
+- 補充基準を下回った商品が買い物リストへ提案される
+- 買い物完了を入庫へ変換できる
+- Windowsクライアントでスキャン登録と買い物リスト印刷ができる
+
+## 実装状況
+
+`WebAPI/`がAPIとスマートフォンPWA、`WinApp/HomeStock.Windows/`がWindowsクライアント、`PrintWorker/`が印刷処理を担当します。置き換え済みの旧試作は削除済みです。

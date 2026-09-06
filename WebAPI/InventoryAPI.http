@@ -1,6 +1,136 @@
-@WebAPI_HostAddress = http://localhost:5186
+@host = http://localhost:8080
+@token = paste-jwt-token-here
+@productId = paste-product-id-here
+@lotId = paste-lot-id-from-inventory-response-here
+@locationId = 00000000-0000-0000-0000-000000000001
+@shoppingListId = paste-completed-shopping-list-id-here
+@shoppingItemId = paste-purchased-shopping-item-id-here
 
-GET {{WebAPI_HostAddress}}/weatherforecast/
-Accept: application/json
+GET {{host}}/health/ready
 
-###
+### 初回ユーザー登録（ユーザーが0件の場合のみ）
+POST {{host}}/api/users/register
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "change-this-password"
+}
+
+### ログイン
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "change-this-password"
+}
+
+### 商品登録
+POST {{host}}/api/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "台所用洗剤",
+  "barcode": "4901234567894",
+  "unit": "個",
+  "reorderPoint": 1,
+  "targetQuantity": 3
+}
+
+### 商品編集（JANコードを解除する場合はnull）
+PATCH {{host}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "台所用洗剤 詰め替え",
+  "barcode": null,
+  "unit": "袋",
+  "reorderPoint": 2,
+  "targetQuantity": 4
+}
+
+### 保管場所一覧
+GET {{host}}/api/locations
+Authorization: Bearer {{token}}
+
+### 入庫
+POST {{host}}/api/inventory/receive
+Authorization: Bearer {{token}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "locationId": "{{locationId}}",
+  "quantity": 5,
+  "expiresOn": "2027-01-31",
+  "note": "まとめ買い"
+}
+
+### 消費
+POST {{host}}/api/inventory/consume
+Authorization: Bearer {{token}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "quantity": 1,
+  "note": "使い切り"
+}
+
+### 在庫一覧
+GET {{host}}/api/inventory?productId={{productId}}
+Authorization: Bearer {{token}}
+
+### 廃棄（期限の近いロットから減算）
+POST {{host}}/api/inventory/discard
+Authorization: Bearer {{token}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "quantity": 1,
+  "locationId": "{{locationId}}",
+  "note": "破損"
+}
+
+### 棚卸調整（在庫一覧で取得したロットを実数へ合わせる）
+POST {{host}}/api/inventory/adjust
+Authorization: Bearer {{token}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "lotId": "{{lotId}}",
+  "countedQuantity": 4,
+  "note": "棚卸実数"
+}
+
+### 入出庫履歴
+GET {{host}}/api/movements?productId={{productId}}
+Authorization: Bearer {{token}}
+
+### 完了した買い物リストを実在庫へ変換
+POST {{host}}/api/shopping-lists/{{shoppingListId}}/receive
+Authorization: Bearer {{token}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "itemId": "{{shoppingItemId}}",
+      "locationId": "{{locationId}}",
+      "expiresOn": "2027-01-31"
+    }
+  ]
+}
+
+### 現在の買い物リストの印刷用データ
+GET {{host}}/api/shopping-lists/current/print
+Authorization: Bearer {{token}}

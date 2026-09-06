@@ -1,61 +1,75 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.EntityFrameworkCore;
+using InventoryAPI.Application.Auth;
+using InventoryAPI.Contracts.Auth;
 using InventoryAPI.Data;
-using InventoryAPI.Models;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using BCrypt.Net;
-using Microsoft.AspNetCore.Identity.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
 
-[Route("api/auth")]
+namespace InventoryAPI.Controllers;
+
+/// <summary>
+/// 認証コントローラー
+/// </summary>
 [ApiController]
-public class AuthController : ControllerBase
+[Route("api/auth")]
+public sealed class AuthController(
+    ApplicationDbContext db,
+    JwtTokenService tokenService,
+    TimeProvider timeProvider) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _config;
-
-    public AuthController(ApplicationDbContext context, IConfiguration config)
-    {
-        _context = context;
-        _config = config;
-    }
-
-    // ログインエンドポイント
+    /// <summary>
+    /// ユーザー名とパスワードを検証し、2時間有効なアクセストークンを発行します。
+    /// </summary>
     [HttpPost("login")]
-    public IActionResult Login([FromBody] UserLogin request)
+    [EnableRateLimiting("login")]
+    public async Task<ActionResult<LoginResponse>> Login(
+        LoginRequest request,
+        CancellationToken cancellationToken)
     {
-        var user = _context.Users.SingleOrDefault(u => u.Username == request.Username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password_Hash))
-            return Unauthorized(new { message = "ユーザー名またはパスワードが違います" });
+        var username = request.Username.Trim();
+        var user = await db.Users.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Username == username, cancellationToken);
 
-        var token = GenerateJwtToken(user);
-        return Ok(new { token });
+        // ユーザーの存在有無を応答から推測できないよう、失敗理由は統一します。
+        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            return Unauthorized(new MessageResponse("ユーザー名またはパスワードが違います。"));
+
+        var response = tokenService.CreateTokenPair(user);
+        db.RefreshTokens.Add(tokenService.CreateRefreshToken(user.Id, response.RefreshToken));
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(response);
     }
 
-
-    // JWTトークンを生成するメソッド
-    private string GenerateJwtToken(User user)
+    /// <summary>
+    /// 有効な更新トークンを一度だけ使用し、新しいアクセストークンと更新トークンへ交換します。
+    /// </summary>
+    [HttpPost("refresh")]
+    public async Task<ActionResult<LoginResponse>> Refresh(
+        RefreshTokenRequest request,
+        CancellationToken cancellationToken)
     {
-        var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]);
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, user.Username) }),
-            Expires = DateTime.UtcNow.AddHours(2),
-            Issuer = _config["Jwt:Issuer"],
-            Audience = _config["Jwt:Audience"],
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
+        var hash = JwtTokenService.HashRefreshToken(request.RefreshToken);
+        var storedToken = await db.RefreshTokens
+            .Include(token => token.User)
+            .SingleOrDefaultAsync(token => token.TokenHash == hash, cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        if (storedToken is null || storedToken.RevokedAt is not null || storedToken.ExpiresAt <= now)
+            return Unauthorized(new MessageResponse("更新トークンが無効または期限切れです。"));
 
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
+        var response = tokenService.CreateTokenPair(storedToken.User);
+        var replacement = tokenService.CreateRefreshToken(storedToken.UserId, response.RefreshToken);
+        var updated = await db.RefreshTokens
+            .Where(token => token.Id == storedToken.Id && token.RevokedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.RevokedAt, now)
+                    .SetProperty(token => token.ReplacedByTokenId, replacement.Id),
+                cancellationToken);
+        if (updated != 1)
+            return Unauthorized(new MessageResponse("更新トークンは既に使用されています。"));
+
+        db.RefreshTokens.Add(replacement);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(response);
     }
-}
-
-public class UserLogin
-{
-    public string Username { get; set; }
-    public string Password { get; set; }
 }
