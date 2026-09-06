@@ -1,14 +1,14 @@
 # Docker開発・Debian配備
 
-WindowsとDebianで同じ`WebAPI/Dockerfile`を使用します。OSごとの差はComposeの環境変数と、本番だけ追加するCaddyに限定します。
+WindowsとDebianで同じ`WebAPI/Dockerfile`を使用します。本番では別サーバーのリバースプロキシでTLSを終端し、VLAN間のHTTPでAPIへ転送します。
 
 ## 前提
 
 - Windows: Docker Desktop（Linux containersモード）とDocker Compose v2
 - Debian: Docker EngineとDocker Compose plugin
-- 本番: Debianホストへ到達するDNS名と、80/443番ポート
+- 本番: 公開DNS名、TLS終端用リバースプロキシ、リバースプロキシからDebianホストへのHTTP経路
 
-ARM64のDebianでもMicrosoft .NET、PostgreSQL、Caddyのマルチアーキテクチャイメージを利用できます。独自のネイティブライブラリを追加する場合は別途確認します。
+ARM64のDebianでもMicrosoft .NETとPostgreSQLのマルチアーキテクチャイメージを利用できます。独自のネイティブライブラリを追加する場合は別途確認します。
 
 ## Windowsで開発する
 
@@ -66,8 +66,10 @@ TZ=Asia/Tokyo
 POSTGRES_PASSWORD=<十分に長いランダム値>
 JWT_KEY=<32バイト以上のランダム値>
 SETUP_TOKEN=<JWT_KEYとは異なる十分に長いランダム値>
-PUBLIC_HOST=stock.example.com
 WEB_ORIGIN=https://stock.example.com
+API_BIND_ADDRESS=192.168.100.29
+API_PORT=8080
+REVERSE_PROXY_IP=192.168.102.41
 ```
 
 `TZ`はレシートへ印字する日時のタイムゾーンです。変更後はAPIコンテナを再作成してください。
@@ -85,10 +87,12 @@ openssl rand -base64 48
 ```bash
 docker compose -f compose.yaml -f compose.production.yaml up --build -d
 docker compose -f compose.yaml -f compose.production.yaml ps
-docker compose -f compose.yaml -f compose.production.yaml logs --tail=100 api caddy
+docker compose -f compose.yaml -f compose.production.yaml logs --tail=100 api
 ```
 
-CaddyがLet's Encrypt等からTLS証明書を自動取得します。ルーターまたはクラウド側では80/443だけをDebianへ通し、5432と8080は公開しません。`8080`はホストのloopbackにだけバインドされます。
+公開HTTPSは`192.168.102.41`のリバースプロキシで終端し、`http://192.168.100.29:8080`へ転送します。リバースプロキシは元のクライアントIPを`X-Forwarded-For`、公開側のスキームを`X-Forwarded-Proto: https`として渡してください。APIは`REVERSE_PROXY_IP`で指定した直前のプロキシからの転送ヘッダーだけを信頼します。
+
+ルーターとDebianホストのファイアウォールでは、`192.168.102.41`から`192.168.100.29:8080`へのTCP通信だけを許可します。8080をインターネットや他の端末へ公開せず、5432はVLAN間にも公開しません。TLS証明書、HTTPからHTTPSへのリダイレクト、HSTSなどのセキュリティヘッダーは外部リバースプロキシで設定します。
 
 起動後は初回ユーザー登録画面へ`SETUP_TOKEN`を入力します。登録が終わったら`.env`の値を新しいランダム値へ交換し、APIコンテナを再作成してください。ログインは送信元IPごとに1分5回へ制限されています。
 
@@ -134,7 +138,7 @@ HOMESTOCK_POSTGRES_TEST_CONNECTION='Host=localhost;Database=homestock_test;Usern
 
 ```bash
 sh ./deploy/smoke-test.sh https://stock.example.com
-docker compose -f compose.yaml -f compose.production.yaml logs --tail=100 api caddy
+docker compose -f compose.yaml -f compose.production.yaml logs --tail=100 api
 ```
 
 本番APIログはJSON形式で相関IDを含み、Composeのログローテーションは1ファイル10MB、最大5ファイルです。

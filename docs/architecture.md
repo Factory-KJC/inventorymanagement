@@ -14,9 +14,9 @@
 | Windows Client | .NET 10 MAUI / WinUI 3 / MVVM | 高度な一覧、棚卸、デバイス連携 |
 | Scanner Adapter | USB-HID | スキャン値をアプリ共通イベントへ変換 |
 | Print Worker | Linux / ESC/POS over TCP | 80mm紙への整形、印刷キュー、再印刷 |
-| Reverse Proxy | Caddy | TLS証明書、HTTPS終端、セキュリティヘッダー |
+| Reverse Proxy | 外部サーバー | TLS証明書、HTTPS終端、セキュリティヘッダー |
 
-外出先から利用するため、Linux上でAPIとPostgreSQLをコンテナ運用します。DBポートは外部公開せず、CaddyだけがHTTPSを受けます。初期導入ではVPN（Tailscale等）経由を推奨し、一般公開が必要な場合だけインターネットへ443/TCPを公開します。どちらの場合もクライアントは同じHTTPS APIを利用します。
+外出先から利用するため、APIとPostgreSQLを`192.168.100.29`上のコンテナで運用します。`192.168.102.41`の外部リバースプロキシがHTTPSを受け、VLAN間のHTTPでAPIへ転送します。DBポートは外部公開しません。
 
 ## 3. モジュール境界
 
@@ -117,24 +117,27 @@ flowchart TB
 
         subgraph Linux["Debian / Docker Compose"]
             direction TB
-            Caddy["Caddy<br/>TLS終端 :443"]
             API["ASP.NET Core 8<br/>Web API + PWA配信 :8080"]
             DB[("PostgreSQL 16<br/>:5432 / 外部非公開")]
             Worker["Print Worker<br/>ESC/POS印刷キュー<br/>計画中"]
 
-            Caddy -->|"HTTP転送"| API
             API -->|"EF Core"| DB
             Worker -.->|"ジョブ取得"| DB
         end
 
-        WPF -->|"HTTPS / JSON API<br/>JWT認証"| Caddy
+        WPF -->|"HTTPS / JSON API<br/>JWT認証"| Proxy
         Worker -.->|"ESC/POS over TCP"| Printer
     end
 
-    Mobile -->|"HTTPS<br/>インターネットまたはVPN"| Caddy
+    subgraph ProxyVlan["Proxy VLAN / 192.168.102.0/24"]
+        Proxy["Reverse Proxy<br/>192.168.102.41 / TLS終端 :443"]
+    end
+
+    Mobile -->|"HTTPS<br/>インターネットまたはVPN"| Proxy
+    Proxy -->|"HTTP :8080<br/>VLAN間通信"| API
 
     classDef planned stroke-dasharray: 5 5
     class Worker planned
 ```
 
-実線は現在の主要な通信経路、破線は計画中の印刷経路を示します。PostgreSQLとAPIの`8080`番ポートはインターネットへ公開せず、外部からの通信はCaddyの`443`番ポートだけで受け付けます。PWAの静的ファイルはWeb APIから配信されるため、PWA専用コンテナはありません。
+実線は現在の主要な通信経路、破線は計画中の印刷経路を示します。APIの`8080`番ポートは`192.168.100.29`にだけバインドし、ファイアウォールで`192.168.102.41`からだけ許可します。PostgreSQLはVLAN間にも公開しません。PWAの静的ファイルはWeb APIから配信されるため、PWA専用コンテナはありません。

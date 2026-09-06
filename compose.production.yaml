@@ -3,30 +3,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Database__AutoMigrate: "true"
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST in .env}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      api:
-        condition: service_healthy
-    networks: [edge]
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-
-volumes:
-  caddy-data:
-  caddy-config:
+      ReverseProxy__KnownProxies__0: ${REVERSE_PROXY_IP:?set REVERSE_PROXY_IP in .env}
+    ports: !override
+      - "${API_BIND_ADDRESS:?set API_BIND_ADDRESS in .env}:${API_PORT:-8080}:8080"

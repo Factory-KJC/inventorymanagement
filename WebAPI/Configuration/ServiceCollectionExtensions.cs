@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using InventoryAPI.Application.Auth;
@@ -8,10 +9,10 @@ using InventoryAPI.Application.Shopping;
 using InventoryAPI.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.HttpOverrides;
 
 namespace InventoryAPI.Configuration;
 
@@ -37,9 +38,18 @@ public static class ServiceCollectionExtensions
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             options.ForwardLimit = 1;
-            // APIはedgeネットワークまたはloopbackだけで待ち受けるため、直前のプロキシを信頼します。
             options.KnownNetworks.Clear();
             options.KnownProxies.Clear();
+
+            foreach (var knownProxy in configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [])
+            {
+                if (!IPAddress.TryParse(knownProxy, out var address))
+                {
+                    throw new InvalidOperationException($"ReverseProxy:KnownProxies contains an invalid IP address: {knownProxy}");
+                }
+
+                options.KnownProxies.Add(address);
+            }
         });
         services.AddCors(options => options.AddPolicy(WebClientCorsPolicy, policy =>
         {

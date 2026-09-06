@@ -36,7 +36,7 @@ Windowsクライアントは.NET 10 MAUI（WinUI 3）とMVVMで新しいAPI・�
 - Problem Details形式のエラー応答
 - EF Core MigrationとPostgreSQL対応
 - Liveness、Readinessエンドポイント
-- Docker Compose、Caddyによる本番配備構成
+- 外部TLS終端リバースプロキシに対応したDocker Compose本番配備構成
 
 ### スマートフォンPWA
 
@@ -136,7 +136,7 @@ APIのMVP不足は解消済みです。Windowsクライアントからの印刷�
 - 同時更新時の競合と楽観的排他制御
 - PostgreSQLでの主要API操作
 - PWAのiOS Safari、Android Chromeでの実機確認
-- Docker ComposeとCaddyを含む配備スモークテスト
+- Docker Composeと外部リバースプロキシを含む配備スモークテスト
 
 ## 5. 次の作業計画
 
@@ -169,7 +169,7 @@ APIのMVP不足は解消済みです。Windowsクライアントからの印刷�
 
 コード受け入れ完了。実ホストでは[配備手順](deployment.md)に従い、初回配備時と月次にスモークテスト・復元試験を実施する。
 
-2026-08-29にWSL上の隔離Docker Composeプロジェクトで、Productionイメージのビルド、PostgreSQL Migration、認証フロー、custom形式バックアップ、別DBへの復元、PostgreSQL専用テスト、Caddy経由のHTTPS・セキュリティヘッダー・相関ID・ヘルスチェック・公開ポートを確認済み。検証用コンテナとボリュームは確認後に削除した。
+2026-08-29にWSL上の隔離Docker Composeプロジェクトで、Productionイメージのビルド、PostgreSQL Migration、認証フロー、custom形式バックアップ、別DBへの復元、PostgreSQL専用テストを確認済みです。当時のCaddy経由の配備検証結果は、外部リバースプロキシ構成への変更後には未確認です。
 
 ### 優先度4: Phase 3 Windowsクライアント（完了）
 
