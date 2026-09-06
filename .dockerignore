@@ -5,8 +5,6 @@
 **/obj
 **/packages
 WinApp
-pages
-UserRegister
 docs
 *.user
 *.suo

@@ -140,3 +140,6 @@ appsetting.json
 
 # Local container secrets
 .env
+
+# VS Code
+.vscode/

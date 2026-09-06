@@ -67,9 +67,9 @@ POSTGRES_PASSWORD=<十分に長いランダム値>
 JWT_KEY=<32バイト以上のランダム値>
 SETUP_TOKEN=<JWT_KEYとは異なる十分に長いランダム値>
 WEB_ORIGIN=https://stock.example.com
-API_BIND_ADDRESS=192.168.100.29
+API_BIND_ADDRESS=<APIのローカルIP>
 API_PORT=8080
-REVERSE_PROXY_IP=192.168.102.41
+REVERSE_PROXY_IP=<リバースプロキシのローカルIP>
 ```
 
 `TZ`はレシートへ印字する日時のタイムゾーンです。変更後はAPIコンテナを再作成してください。

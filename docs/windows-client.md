@@ -1,6 +1,6 @@
 # Windowsクライアント利用ガイド
 
-Phase 3のWindowsクライアントは `WinApp/HomeStock.Windows.sln` にあります。.NET 10 MAUIのWindows専用ターゲットで、WinUI 3上にMVVMで実装しています。旧 `WinApp/InventoryManagementWin` は比較用の試作であり、新規開発には使用しません。
+Phase 3のWindowsクライアントは `WinApp/HomeStock.Windows.sln` にあります。.NET 10 MAUIのWindows専用ターゲットで、WinUI 3上にMVVMで実装しています。
 
 ## 起動
 

@@ -5,7 +5,7 @@
 - プロジェクト名: Home Stock
 - 目的: 家庭の日用品・食料品について、在庫、期限、入出庫履歴、補充候補を管理する。
 - 詳細な要件と構成は `README.md` および `docs/` を参照する。
-- `WebAPI/` が新実装であり、`pages/`、`WinApp/`、`UserRegister/` は段階的に置き換える旧試作である。変更前に `docs/implementation-status.md` と `docs/roadmap.md` を確認する。
+- `WebAPI/` がAPIとPWA、`WinApp/HomeStock.Windows/` がWindowsクライアント、`PrintWorker/` が印刷処理の現行実装である。変更前に `docs/implementation-status.md` と `docs/roadmap.md` を確認する。
 
 ## 共通原則
 
