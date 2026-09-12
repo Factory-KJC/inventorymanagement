@@ -119,6 +119,8 @@ dotnet tool run dotnet-ef migrations add <MigrationName> --project WebAPI/Invent
 
 ## バックアップと復元試験
 
+TeraStationへ日次で暗号化保存する本番手順は[TeraStationへのDBバックアップ](backup-terastation.md)を参照してください。以下はローカルdumpを作成して復元試験するための基本コマンドです。
+
 ```bash
 BACKUP_DIRECTORY=/srv/backups/home-stock BACKUP_RETENTION_DAYS=14 sh ./deploy/backup.sh
 sh ./deploy/restore-test.sh /srv/backups/home-stock/homestock-<timestamp>.dump

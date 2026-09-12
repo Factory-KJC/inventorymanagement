@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Home Stock backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=home-stock-backup.service
+
+[Install]
+WantedBy=timers.target

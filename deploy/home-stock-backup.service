@@ -1,0 +1,16 @@
+[Unit]
+Description=Back up Home Stock PostgreSQL to TeraStation
+RequiresMountsFor=/mnt/terastation-home-stock
+After=docker.service network-online.target remote-fs.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=homestock
+Group=homestock
+WorkingDirectory=/opt/home-stock
+EnvironmentFile=/etc/home-stock/backup.env
+ExecStart=/bin/sh /opt/home-stock/deploy/backup-to-nas.sh
+
+[Install]
+WantedBy=multi-user.target
