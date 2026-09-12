@@ -458,11 +458,14 @@ public sealed class ApiWorkflowTests
 
         var index = await client.GetStringAsync("/");
         var manifestResponse = await client.GetAsync("/manifest.webmanifest");
+        var iconResponse = await client.GetAsync("/icon.svg");
         var serviceWorker = await client.GetStringAsync("/service-worker.js");
         var script = await client.GetStringAsync("/app.js");
         using var manifest = JsonDocument.Parse(await manifestResponse.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.OK, manifestResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, iconResponse.StatusCode);
+        Assert.Equal("image/svg+xml", iconResponse.Content.Headers.ContentType?.MediaType);
         Assert.Contains("rel=\"manifest\"", index);
         Assert.Contains("name=\"viewport\"", index);
         Assert.Equal("/", manifest.RootElement.GetProperty("id").GetString());

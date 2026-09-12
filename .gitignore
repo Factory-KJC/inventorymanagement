@@ -141,5 +141,8 @@ appsetting.json
 # Local container secrets
 .env
 
+# Generated from the repository-wide branding asset during WebAPI builds
+WebAPI/wwwroot/icon.svg
+
 # VS Code
 .vscode/

@@ -10,7 +10,7 @@
   <Properties>
     <DisplayName>Home Stock</DisplayName>
     <PublisherDisplayName>Home Stock</PublisherDisplayName>
-    <Logo>appiconStoreLogo.png</Logo>
+    <Logo>home_stock_iconStoreLogo.png</Logo>
   </Properties>
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
@@ -20,9 +20,9 @@
   </Resources>
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
-      <uap:VisualElements DisplayName="Home Stock" Description="家庭在庫管理" Square150x150Logo="appiconMediumTile.png" Square44x44Logo="appiconLogo.png" BackgroundColor="transparent">
-        <uap:DefaultTile Wide310x150Logo="appiconWideTile.png" Square310x310Logo="appiconLargeTile.png" />
-        <uap:SplashScreen Image="splashSplashScreen.png" />
+      <uap:VisualElements DisplayName="Home Stock" Description="家庭在庫管理" Square150x150Logo="home_stock_iconMediumTile.png" Square44x44Logo="home_stock_iconLogo.png" BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="home_stock_iconWideTile.png" Square310x310Logo="home_stock_iconLargeTile.png" />
+        <uap:SplashScreen Image="home_stock_iconSplashScreen.png" />
       </uap:VisualElements>
     </Application>
   </Applications>
