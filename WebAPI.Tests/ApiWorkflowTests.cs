@@ -508,6 +508,24 @@ public sealed class ApiWorkflowTests
         Assert.Contains("$(\"#logout\").onclick = logout", script);
     }
 
+    [Fact]
+    public async Task PwaSections_ProvideIndependentReloadActions()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+
+        var index = await client.GetStringAsync("/");
+        var script = await client.GetStringAsync("/app.js");
+
+        Assert.Contains("id=\"reload-home\"", index);
+        Assert.Contains("id=\"reload-inventory\"", index);
+        Assert.Contains("id=\"reload-shopping\"", index);
+        Assert.Contains("$(\"#reload-home\").onclick = reloadHome", script);
+        Assert.Contains("$(\"#reload-inventory\").onclick = reloadInventorySection", script);
+        Assert.Contains("$(\"#reload-shopping\").onclick = reloadShopping", script);
+        Assert.Contains("button.setAttribute(\"aria-busy\", \"true\")", script);
+    }
+
     private sealed class InventoryApiFactory : WebApplicationFactory<Program>, IAsyncDisposable
     {
         private readonly SqliteConnection connection = new("Data Source=:memory:");

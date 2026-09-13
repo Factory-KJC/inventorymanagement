@@ -38,6 +38,7 @@
 
     <main class="content">
       <section id="home-page" class="page active">
+        <div class="page-actions"><button id="reload-home" class="small-button" type="button">再読み込み</button></div>
         <div id="stats" class="stats-grid"></div>
         <div class="section-heading"><h2>まもなく期限</h2><button data-page="inventory" class="text-button">すべて見る</button></div>
         <div id="expiring-list" class="card-list"></div>
@@ -48,12 +49,12 @@
       </section>
 
       <section id="inventory-page" class="page">
-        <div class="toolbar"><input id="inventory-search" type="search" placeholder="商品名・JANコードで検索"><select id="inventory-sort" aria-label="在庫の並び順"><option value="name:asc">商品名（昇順）</option><option value="name:desc">商品名（降順）</option><option value="expiration:asc">期限が近い順</option><option value="quantity:asc">数量が少ない順</option><option value="quantity:desc">数量が多い順</option></select><button id="open-receive" class="primary compact">入庫</button></div>
+        <div class="toolbar"><input id="inventory-search" type="search" placeholder="商品名・JANコードで検索"><select id="inventory-sort" aria-label="在庫の並び順"><option value="name:asc">商品名（昇順）</option><option value="name:desc">商品名（降順）</option><option value="expiration:asc">期限が近い順</option><option value="quantity:asc">数量が少ない順</option><option value="quantity:desc">数量が多い順</option></select><button id="reload-inventory" class="small-button" type="button">再読み込み</button><button id="open-receive" class="primary compact" type="button">入庫</button></div>
         <div id="inventory-list" class="card-list"></div>
       </section>
 
       <section id="shopping-page" class="page">
-        <div class="toolbar"><button id="generate-shopping" class="primary">不足品を提案</button></div>
+        <div class="toolbar"><button id="reload-shopping" class="small-button" type="button">再読み込み</button><button id="generate-shopping" class="primary" type="button">不足品を提案</button></div>
         <form id="shopping-form" class="inline-form"><input id="shopping-name" placeholder="買うもの" required><input id="shopping-quantity" type="number" value="1" min="0.0001" step="any" required><button type="submit">追加</button></form>
         <div id="shopping-list" class="card-list"></div>
       </section>

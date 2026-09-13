@@ -45,6 +45,7 @@ Windowsクライアントは.NET 10 MAUI（WinUI 3）とMVVMで新しいAPI・�
 - 商品登録と在庫検索
 - 入庫・消費操作
 - 買い物リストの表示、追加、候補生成、購入状態更新
+- ホーム、在庫、買い物の項目別再読み込み
 - レスポンシブ表示
 - Web App ManifestとService Worker
 - IndexedDBを使った入庫・消費コマンドの再送キュー
