@@ -196,6 +196,45 @@ async function reloadInventory() {
   }
 }
 
+async function reloadHome() {
+  await reloadSection($("#reload-home"), async () => {
+    const [dashboard, inventory] = await Promise.all([
+      api(API.dashboard),
+      fetchInventory()
+    ]);
+    state.inventory = inventory;
+    renderDashboard(dashboard);
+  });
+}
+
+async function reloadInventorySection() {
+  await reloadSection($("#reload-inventory"), async () => {
+    state.inventory = await fetchInventory();
+    renderInventory();
+  });
+}
+
+async function reloadShopping() {
+  await reloadSection($("#reload-shopping"), async () => {
+    state.shopping = await api(API.shoppingList);
+    renderShopping();
+  });
+}
+
+async function reloadSection(button, reload) {
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  try {
+    await reload();
+    toast("再読み込みしました");
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+}
+
 // -----------------------------------------------------------------------------
 // ダッシュボードと一覧描画
 // -----------------------------------------------------------------------------
@@ -618,6 +657,9 @@ function bindEvents() {
   $("#login-form").addEventListener("submit", handleLogin);
   $("#setup-button").onclick = registerInitialUser;
   $("#logout").onclick = logout;
+  $("#reload-home").onclick = reloadHome;
+  $("#reload-inventory").onclick = reloadInventorySection;
+  $("#reload-shopping").onclick = reloadShopping;
   $("#inventory-search").onchange = reloadInventory;
   $("#inventory-sort").onchange = reloadInventory;
   $("#quick-receive").onclick = $("#open-receive").onclick = () => openDialog("stock-dialog");
