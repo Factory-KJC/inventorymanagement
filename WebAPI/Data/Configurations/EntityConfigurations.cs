@@ -71,6 +71,27 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .WithMany()
             .HasForeignKey(product => product.HouseholdId)
             .OnDelete(DeleteBehavior.Cascade);
+        entity.HasOne<ProductGroup>()
+            .WithMany()
+            .HasForeignKey(product => product.ProductGroupId)
+            .OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+internal sealed class ProductGroupConfiguration : IEntityTypeConfiguration<ProductGroup>
+{
+    public void Configure(EntityTypeBuilder<ProductGroup> entity)
+    {
+        entity.ToTable("product_groups", DatabaseSchema.Inventory);
+        entity.Property(group => group.Name).HasMaxLength(200);
+        entity.Property(group => group.Unit).HasMaxLength(20);
+        entity.Property(group => group.ReorderPoint).HasPrecision(18, 4);
+        entity.Property(group => group.TargetQuantity).HasPrecision(18, 4);
+        entity.HasIndex(group => new { group.HouseholdId, group.Name }).IsUnique();
+        entity.HasOne<Household>()
+            .WithMany()
+            .HasForeignKey(group => group.HouseholdId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

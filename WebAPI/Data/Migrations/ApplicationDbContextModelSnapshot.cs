@@ -49,6 +49,9 @@ namespace InventoryAPI.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("ProductGroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("ReorderPoint")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -67,10 +70,53 @@ namespace InventoryAPI.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductGroupId");
+
                     b.HasIndex("HouseholdId", "Barcode")
                         .IsUnique();
 
                     b.ToTable("products", "inventorymanagement");
+                });
+
+            modelBuilder.Entity("InventoryAPI.Domain.Catalog.ProductGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("ReorderPoint")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("TargetQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HouseholdId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("product_groups", "inventorymanagement");
                 });
 
             modelBuilder.Entity("InventoryAPI.Domain.Households.Household", b =>
@@ -456,6 +502,20 @@ namespace InventoryAPI.Data.Migrations
                 });
 
             modelBuilder.Entity("InventoryAPI.Domain.Catalog.Product", b =>
+                {
+                    b.HasOne("InventoryAPI.Domain.Households.Household", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("InventoryAPI.Domain.Catalog.ProductGroup", null)
+                        .WithMany()
+                        .HasForeignKey("ProductGroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("InventoryAPI.Domain.Catalog.ProductGroup", b =>
                 {
                     b.HasOne("InventoryAPI.Domain.Households.Household", null)
                         .WithMany()

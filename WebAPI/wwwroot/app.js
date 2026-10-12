@@ -466,7 +466,8 @@ async function handleProductSubmit(event) {
         barcode: value("#product-barcode") || null,
         unit: value("#product-unit"),
         reorderPoint: optionalNumber("#reorder-point"),
-        targetQuantity: optionalNumber("#target-quantity")
+        targetQuantity: optionalNumber("#target-quantity"),
+        productGroupName: value("#product-group-name") || null
       })
     });
     $("#product-dialog").close();

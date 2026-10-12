@@ -28,6 +28,66 @@ namespace InventoryAPI.Tests;
 public sealed class ApiWorkflowTests
 {
     [Fact]
+    public async Task ProductGroup_WhenAllMembersDeleted_IsExcludedFromLowStockDashboard()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var createResponse = await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+            "A社 食パン", null, "袋", 1, 2, "食パン"));
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var product = await createResponse.Content.ReadFromJsonAsync<ProductResponse>();
+        Assert.NotNull(product);
+
+        var deleteResponse = await client.DeleteAsync($"/api/products/{product.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        var summary = await client.GetFromJsonAsync<DashboardResponse>("/api/dashboard");
+        var lowStock = await client.GetFromJsonAsync<DashboardListResponse>("/api/dashboard/low-stock");
+        Assert.NotNull(summary);
+        Assert.NotNull(lowStock);
+        Assert.Equal(0, summary.LowStockCount);
+        Assert.Empty(lowStock.Items);
+    }
+
+    [Fact]
+    public async Task ProductGroup_AggregatesDifferentBarcodesForReorderSuggestion()
+    {
+        await using var factory = new InventoryApiFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthenticationHandler.SchemeName);
+        var first = await (await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+            "A社 洗剤 500ml", "4901234567894", "個", 3, 4, "洗濯洗剤"))).Content.ReadFromJsonAsync<ProductResponse>();
+        var second = await (await client.PostAsJsonAsync("/api/products", new CreateProductRequest(
+            "B社 洗剤 900ml", "4901234567887", "個", 3, 4, "洗濯洗剤"))).Content.ReadFromJsonAsync<ProductResponse>();
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        var location = Assert.Single((await client.GetFromJsonAsync<List<LocationResponse>>("/api/locations"))!);
+
+        foreach (var product in new[] { first!, second! })
+        {
+            var receive = new HttpRequestMessage(HttpMethod.Post, "/api/inventory/receive")
+            {
+                Content = JsonContent.Create(new ReceiveStockRequest(product.Id, location.Id, 1, null, null))
+            };
+            receive.Headers.Add("Idempotency-Key", $"group-receive-{product.Id:N}");
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(receive)).StatusCode);
+        }
+
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+        var suggestionResponse = await client.PostAsync("/api/shopping-lists/current/generate", null);
+        var shoppingList = await suggestionResponse.Content.ReadFromJsonAsync<ShoppingListResponse>(jsonOptions);
+
+        var suggestion = Assert.Single(shoppingList!.Items);
+        Assert.Equal("洗濯洗剤", suggestion.Name);
+        Assert.Equal(2, suggestion.Quantity);
+        var products = await client.GetFromJsonAsync<List<ProductResponse>>("/api/products");
+        Assert.Equal(2, products!.Count);
+        Assert.All(products, product => Assert.Equal(first.ProductGroupId, product.ProductGroupId));
+    }
+
+    [Fact]
     public async Task SoftDelete_SuggestsAndRestoresProductAndLocation()
     {
         await using var factory = new InventoryApiFactory();

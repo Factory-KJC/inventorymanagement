@@ -34,7 +34,10 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
         if (!string.IsNullOrWhiteSpace(query))
         {
             var search = query.Trim();
-            products = products.Where(x => EF.Functions.ILike(x.Name, $"%{search}%"));
+            products = products.Where(x =>
+                EF.Functions.ILike(x.Name, $"%{search}%") ||
+                (x.ProductGroupId != null && db.ProductGroups.Any(group =>
+                    group.Id == x.ProductGroupId && EF.Functions.ILike(group.Name, $"%{search}%"))));
         }
 
         if (!string.IsNullOrWhiteSpace(barcode))
@@ -43,14 +46,19 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
             products = products.Where(x => x.Barcode == normalizedBarcode);
         }
 
-        return await products.OrderBy(x => x.Name)
-            .Select(product => new ProductResponse(
+        return await (from product in products
+            join productGroup in db.ProductGroups.AsNoTracking() on product.ProductGroupId equals productGroup.Id into groups
+            from productGroup in groups.DefaultIfEmpty()
+            orderby product.Name
+            select new ProductResponse(
                 product.Id,
                 product.Name,
                 product.Barcode,
                 product.Unit,
-                product.ReorderPoint,
-                product.TargetQuantity))
+                productGroup != null ? productGroup.ReorderPoint : product.ReorderPoint,
+                productGroup != null ? productGroup.TargetQuantity : product.TargetQuantity,
+                product.ProductGroupId,
+                productGroup != null ? productGroup.Name : null))
             .ToListAsync(cancellationToken);
     }
 
@@ -63,15 +71,19 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProductResponse>> GetProduct(Guid id, CancellationToken cancellationToken)
     {
-        var product = await db.Products.AsNoTracking()
-            .Where(x => x.Id == id && x.HouseholdId == SystemDefaults.HouseholdId && !x.IsDeleted)
-            .Select(product => new ProductResponse(
-                product.Id,
-                product.Name,
-                product.Barcode,
-                product.Unit,
-                product.ReorderPoint,
-                product.TargetQuantity))
+        var product = await (from candidate in db.Products.AsNoTracking()
+            join productGroup in db.ProductGroups.AsNoTracking() on candidate.ProductGroupId equals productGroup.Id into groups
+            from productGroup in groups.DefaultIfEmpty()
+            where candidate.Id == id && candidate.HouseholdId == SystemDefaults.HouseholdId && !candidate.IsDeleted
+            select new ProductResponse(
+                candidate.Id,
+                candidate.Name,
+                candidate.Barcode,
+                candidate.Unit,
+                productGroup != null ? productGroup.ReorderPoint : candidate.ReorderPoint,
+                productGroup != null ? productGroup.TargetQuantity : candidate.TargetQuantity,
+                candidate.ProductGroupId,
+                productGroup != null ? productGroup.Name : null))
             .SingleOrDefaultAsync(cancellationToken);
         return product is null ? NotFound() : Ok(product);
     }
@@ -105,22 +117,24 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
             return Conflict(new ProblemDetails { Title = "このJANコードは登録済みです。", Status = StatusCodes.Status409Conflict });
 
         var now = timeProvider.GetUtcNow();
+        var productGroup = await GetOrCreateProductGroupAsync(request.ProductGroupName, unit, request.ReorderPoint, request.TargetQuantity, now, cancellationToken);
         var product = new Product
         {
             Id = Guid.NewGuid(),
             HouseholdId = SystemDefaults.HouseholdId,
+            ProductGroupId = productGroup?.Id,
             Name = name,
             Barcode = barcode,
             Unit = unit,
-            ReorderPoint = request.ReorderPoint,
-            TargetQuantity = request.TargetQuantity,
+            ReorderPoint = productGroup is null ? request.ReorderPoint : null,
+            TargetQuantity = productGroup is null ? request.TargetQuantity : null,
             CreatedAt = now,
             UpdatedAt = now
         };
         db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
 
-        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, ToResponse(product));
+        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, ToResponse(product, productGroup));
     }
 
     /// <summary>
@@ -178,15 +192,18 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
             });
         }
 
+        var now = timeProvider.GetUtcNow();
+        var productGroup = await GetOrCreateProductGroupAsync(request.ProductGroupName, unit, request.ReorderPoint, request.TargetQuantity, now, cancellationToken);
         product.Name = name;
         product.Barcode = barcode;
         product.Unit = unit;
-        product.ReorderPoint = request.ReorderPoint;
-        product.TargetQuantity = request.TargetQuantity;
-        product.UpdatedAt = timeProvider.GetUtcNow();
+        product.ProductGroupId = productGroup?.Id;
+        product.ReorderPoint = productGroup is null ? request.ReorderPoint : null;
+        product.TargetQuantity = productGroup is null ? request.TargetQuantity : null;
+        product.UpdatedAt = now;
         await db.SaveChangesAsync(cancellationToken);
 
-        return Ok(ToResponse(product));
+        return Ok(ToResponse(product, productGroup));
     }
 
     /// <summary>商品を履歴から参照可能な状態で論理削除します。</summary>
@@ -262,23 +279,65 @@ public sealed class ProductsController(ApplicationDbContext db, TimeProvider tim
             return Conflict(new ProblemDetails { Title = "同じ商品名またはJANコードの商品が存在します。", Status = StatusCodes.Status409Conflict });
         }
 
+        var now = timeProvider.GetUtcNow();
+        var productGroup = await GetOrCreateProductGroupAsync(request.ProductGroupName, unit, request.ReorderPoint, request.TargetQuantity, now, cancellationToken);
         product.Name = name;
         product.Barcode = barcode;
         product.Unit = unit;
-        product.ReorderPoint = request.ReorderPoint;
-        product.TargetQuantity = request.TargetQuantity;
+        product.ProductGroupId = productGroup?.Id;
+        product.ReorderPoint = productGroup is null ? request.ReorderPoint : null;
+        product.TargetQuantity = productGroup is null ? request.TargetQuantity : null;
         product.IsDeleted = false;
         product.DeletedAt = null;
-        product.UpdatedAt = timeProvider.GetUtcNow();
+        product.UpdatedAt = now;
         await db.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(product));
+        return Ok(ToResponse(product, productGroup));
     }
 
-    private static ProductResponse ToResponse(Product product) => new(
+    private async Task<ProductGroup?> GetOrCreateProductGroupAsync(
+        string? requestedName,
+        string unit,
+        decimal? reorderPoint,
+        decimal? targetQuantity,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var groupName = string.IsNullOrWhiteSpace(requestedName) ? null : requestedName.Trim();
+        if (groupName is null)
+        {
+            return null;
+        }
+
+        var group = await db.ProductGroups.SingleOrDefaultAsync(
+            candidate => candidate.HouseholdId == SystemDefaults.HouseholdId && candidate.Name == groupName,
+            cancellationToken);
+        if (group is null)
+        {
+            group = new ProductGroup
+            {
+                Id = Guid.NewGuid(),
+                HouseholdId = SystemDefaults.HouseholdId,
+                Name = groupName,
+                Unit = unit,
+                CreatedAt = now
+            };
+            db.ProductGroups.Add(group);
+        }
+
+        group.Unit = unit;
+        group.ReorderPoint = reorderPoint;
+        group.TargetQuantity = targetQuantity;
+        group.UpdatedAt = now;
+        return group;
+    }
+
+    private static ProductResponse ToResponse(Product product, ProductGroup? group) => new(
         product.Id,
         product.Name,
         product.Barcode,
         product.Unit,
-        product.ReorderPoint,
-        product.TargetQuantity);
+        group?.ReorderPoint ?? product.ReorderPoint,
+        group?.TargetQuantity ?? product.TargetQuantity,
+        product.ProductGroupId,
+        group?.Name);
 }
