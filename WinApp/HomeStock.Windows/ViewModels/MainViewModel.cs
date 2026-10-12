@@ -33,6 +33,7 @@ public sealed class MainViewModel : ObservableObject
     private int _selectedInventorySortIndex;
     private string _productName = string.Empty;
     private string _productBarcode = string.Empty;
+    private string _productGroupName = string.Empty;
     private string _productUnit = "個";
     private string _reorderPoint = string.Empty;
     private string _targetQuantity = string.Empty;
@@ -144,6 +145,7 @@ public sealed class MainViewModel : ObservableObject
     public int SelectedInventorySortIndex { get => _selectedInventorySortIndex; set => SetProperty(ref _selectedInventorySortIndex, value); }
     public string ProductName { get => _productName; set => SetProperty(ref _productName, value); }
     public string ProductBarcode { get => _productBarcode; set => SetProperty(ref _productBarcode, value); }
+    public string ProductGroupName { get => _productGroupName; set => SetProperty(ref _productGroupName, value); }
     public string ProductUnit { get => _productUnit; set => SetProperty(ref _productUnit, value); }
     public string ReorderPoint { get => _reorderPoint; set => SetProperty(ref _reorderPoint, value); }
     public string TargetQuantity { get => _targetQuantity; set => SetProperty(ref _targetQuantity, value); }
@@ -288,7 +290,7 @@ public sealed class MainViewModel : ObservableObject
             throw new InvalidOperationException("商品名と単位を入力してください。");
         }
 
-        var request = new UpdateProductRequest(name, EmptyToNull(ProductBarcode), unit, ParseOptionalDecimal(ReorderPoint, "補充点"), ParseOptionalDecimal(TargetQuantity, "目標在庫"));
+        var request = new UpdateProductRequest(name, EmptyToNull(ProductBarcode), unit, ParseOptionalDecimal(ReorderPoint, "補充点"), ParseOptionalDecimal(TargetQuantity, "目標在庫"), EmptyToNull(ProductGroupName));
         ProductResponse product;
         string status;
         if (_editingProductId.HasValue)
@@ -311,7 +313,7 @@ public sealed class MainViewModel : ObservableObject
                     throw new InvalidOperationException("同名の削除済み商品があります。復元するか、別の名称を入力してください。");
                 }
 
-                product = await _apiClient.CreateProductAsync(new CreateProductRequest(request.Name, request.Barcode, request.Unit, request.ReorderPoint, request.TargetQuantity), cancellationToken);
+                product = await _apiClient.CreateProductAsync(new CreateProductRequest(request.Name, request.Barcode, request.Unit, request.ReorderPoint, request.TargetQuantity, request.ProductGroupName), cancellationToken);
                 status = $"{product.Name} を登録しました。";
             }
         }
@@ -334,6 +336,7 @@ public sealed class MainViewModel : ObservableObject
         _editingProductId = SelectedProduct.Id;
         ProductName = SelectedProduct.Name;
         ProductBarcode = SelectedProduct.Barcode ?? string.Empty;
+        ProductGroupName = SelectedProduct.ProductGroupName ?? string.Empty;
         ProductUnit = SelectedProduct.Unit;
         ReorderPoint = FormatDecimal(SelectedProduct.ReorderPoint);
         TargetQuantity = FormatDecimal(SelectedProduct.TargetQuantity);
@@ -601,6 +604,7 @@ public sealed class MainViewModel : ObservableObject
         _editingProductId = null;
         ProductName = string.Empty;
         ProductBarcode = string.Empty;
+        ProductGroupName = string.Empty;
         ProductUnit = "個";
         ReorderPoint = string.Empty;
         TargetQuantity = string.Empty;

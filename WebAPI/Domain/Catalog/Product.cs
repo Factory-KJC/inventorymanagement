@@ -7,6 +7,7 @@ public sealed class Product
 {
     public Guid Id { get; set; }
     public Guid HouseholdId { get; set; }
+    public Guid? ProductGroupId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Barcode { get; set; }
     public string Unit { get; set; } = "個";

@@ -21,12 +21,24 @@ public sealed class DashboardService(ApplicationDbContext db, TimeProvider timeP
             product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted,
             cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);
-        var reorderProducts = await db.Products.AsNoTracking()
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted && product.ReorderPoint != null)
-            .Select(product => new { product.Id, ReorderPoint = product.ReorderPoint!.Value })
+        var products = await db.Products.AsNoTracking()
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted)
             .ToListAsync(cancellationToken);
-        var lowStockCount = reorderProducts.Count(
-            product => quantities.GetValueOrDefault(product.Id) < product.ReorderPoint);
+        var activeGroupIds = products.Where(product => product.ProductGroupId.HasValue)
+            .Select(product => product.ProductGroupId.GetValueOrDefault())
+            .Distinct()
+            .ToList();
+        var productGroups = await db.ProductGroups.AsNoTracking()
+            .Where(group => group.HouseholdId == SystemDefaults.HouseholdId &&
+                            activeGroupIds.Contains(group.Id) && group.ReorderPoint != null)
+            .ToListAsync(cancellationToken);
+        var lowStockCount = products.Count(product =>
+                product.ProductGroupId == null &&
+                product.ReorderPoint != null &&
+                quantities.GetValueOrDefault(product.Id) < product.ReorderPoint) +
+            productGroups.Count(group =>
+                products.Where(product => product.ProductGroupId == group.Id)
+                    .Sum(product => quantities.GetValueOrDefault(product.Id)) < group.ReorderPoint);
 
         var (today, deadline) = GetExpirationPeriod();
         var expiringSoonCount = await db.StockLots.CountAsync(lot =>
@@ -94,19 +106,44 @@ public sealed class DashboardService(ApplicationDbContext db, TimeProvider timeP
     private async Task<List<DashboardItemResponse>> GetLowStockAsync(CancellationToken cancellationToken)
     {
         var products = await db.Products.AsNoTracking()
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted && product.ReorderPoint != null)
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted)
             .OrderBy(product => product.Name)
+            .ToListAsync(cancellationToken);
+        var activeGroupIds = products.Where(product => product.ProductGroupId.HasValue)
+            .Select(product => product.ProductGroupId.GetValueOrDefault())
+            .Distinct()
+            .ToList();
+        var productGroups = await db.ProductGroups.AsNoTracking()
+            .Where(group => group.HouseholdId == SystemDefaults.HouseholdId &&
+                            activeGroupIds.Contains(group.Id) && group.ReorderPoint != null)
+            .OrderBy(group => group.Name)
             .ToListAsync(cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);
 
-        return products
-            .Where(product => quantities.GetValueOrDefault(product.Id) < product.ReorderPoint!.Value)
+        var items = products
+            .Where(product => product.ProductGroupId == null &&
+                              product.ReorderPoint != null &&
+                              quantities.GetValueOrDefault(product.Id) < product.ReorderPoint.Value)
             .Select(product => new DashboardItemResponse(
                 product.Id,
                 product.Name,
                 $"補充点 {product.ReorderPoint} {product.Unit} / 目標 {product.TargetQuantity ?? product.ReorderPoint} {product.Unit}",
                 quantities.GetValueOrDefault(product.Id)))
             .ToList();
+        items.AddRange(productGroups
+            .Select(group => new
+            {
+                Group = group,
+                Quantity = products.Where(product => product.ProductGroupId == group.Id)
+                    .Sum(product => quantities.GetValueOrDefault(product.Id))
+            })
+            .Where(item => item.Quantity < item.Group.ReorderPoint!.Value)
+            .Select(item => new DashboardItemResponse(
+                item.Group.Id,
+                item.Group.Name,
+                $"複数JAN合計 · 補充点 {item.Group.ReorderPoint} {item.Group.Unit} / 目標 {item.Group.TargetQuantity ?? item.Group.ReorderPoint} {item.Group.Unit}",
+                item.Quantity)));
+        return items.OrderBy(item => item.Name).ToList();
     }
 
     private async Task<List<DashboardItemResponse>> GetExpiringAsync(CancellationToken cancellationToken)

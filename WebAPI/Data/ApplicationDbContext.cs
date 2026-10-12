@@ -18,6 +18,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Household> Households => Set<Household>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductGroup> ProductGroups => Set<ProductGroup>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<StockLot> StockLots => Set<StockLot>();
     public DbSet<StockOperation> StockOperations => Set<StockOperation>();

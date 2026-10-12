@@ -7,14 +7,16 @@ public sealed record CreateProductRequest(
     [StringLength(32)] string? Barcode,
     [Required, StringLength(20)] string Unit,
     [Range(0, 999999999)] decimal? ReorderPoint,
-    [Range(0, 999999999)] decimal? TargetQuantity);
+    [Range(0, 999999999)] decimal? TargetQuantity,
+    [StringLength(200)] string? ProductGroupName = null);
 
 public sealed record UpdateProductRequest(
     [Required, StringLength(200)] string Name,
     [StringLength(32)] string? Barcode,
     [Required, StringLength(20)] string Unit,
     [Range(0, 999999999)] decimal? ReorderPoint,
-    [Range(0, 999999999)] decimal? TargetQuantity);
+    [Range(0, 999999999)] decimal? TargetQuantity,
+    [StringLength(200)] string? ProductGroupName = null);
 
 public sealed record ProductResponse(
     Guid Id,
@@ -22,6 +24,8 @@ public sealed record ProductResponse(
     string? Barcode,
     string Unit,
     decimal? ReorderPoint,
-    decimal? TargetQuantity);
+    decimal? TargetQuantity,
+    Guid? ProductGroupId = null,
+    string? ProductGroupName = null);
 
 public sealed record DeletedProductSuggestionResponse(Guid Id, string Name, string? Barcode, string Unit);

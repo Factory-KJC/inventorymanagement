@@ -72,6 +72,7 @@
       <header><h2>商品を登録</h2><button type="button" class="close-dialog" aria-label="閉じる">×</button></header>
       <label>商品名<input id="product-name" required maxlength="200"></label>
       <label>JANコード<input id="product-barcode" inputmode="numeric" maxlength="13" placeholder="任意"></label>
+      <label>管理品目<input id="product-group-name" maxlength="200" placeholder="例: 洗濯洗剤（ブランド・容量違いをまとめる場合）"></label>
       <div class="two-columns"><label>単位<input id="product-unit" value="個" required></label><label>補充点<input id="reorder-point" type="number" min="0" step="any"></label></div>
       <label>目標在庫<input id="target-quantity" type="number" min="0" step="any"></label>
       <button class="primary" type="submit">登録する</button>

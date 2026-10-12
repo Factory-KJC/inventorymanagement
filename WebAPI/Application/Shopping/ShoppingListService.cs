@@ -88,31 +88,44 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
         var list = await GetOrCreateCurrentAsync(cancellationToken);
         var quantities = await GetQuantityByProductAsync(cancellationToken);
         var products = await db.Products
-            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted && product.ReorderPoint != null)
+            .Where(product => product.HouseholdId == SystemDefaults.HouseholdId && !product.IsDeleted)
+            .ToListAsync(cancellationToken);
+        var groupIds = products.Where(product => product.ProductGroupId.HasValue)
+            .Select(product => product.ProductGroupId!.Value)
+            .Distinct()
+            .ToList();
+        var productGroups = await db.ProductGroups
+            .Where(group => groupIds.Contains(group.Id) && group.ReorderPoint != null)
             .ToListAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
 
-        foreach (var product in products)
+        foreach (var productGroup in productGroups)
         {
-            var currentQuantity = quantities.GetValueOrDefault(product.Id);
-            if (currentQuantity >= product.ReorderPoint!.Value)
+            var members = products.Where(product => product.ProductGroupId == productGroup.Id).ToList();
+            var currentQuantity = members.Sum(product => quantities.GetValueOrDefault(product.Id));
+            if (currentQuantity >= productGroup.ReorderPoint!.Value)
                 continue;
 
             var existingSuggestion = list.Items.FirstOrDefault(item =>
-                item.ProductId == product.Id && item.Source == ShoppingItemSource.ReorderSuggestion);
+                item.ProductId.HasValue &&
+                members.Any(product => product.Id == item.ProductId.Value) &&
+                item.Source == ShoppingItemSource.ReorderSuggestion);
 
             // 購入済み・却下済みの提案は、同じ有効リスト内では利用者の判断を優先して復活させません。
             if (existingSuggestion is { Status: ShoppingItemStatus.Dismissed or ShoppingItemStatus.Purchased })
                 continue;
 
-            var targetQuantity = product.TargetQuantity ?? product.ReorderPoint.Value;
+            var targetQuantity = productGroup.TargetQuantity ?? productGroup.ReorderPoint.Value;
             var suggestedQuantity = Math.Max(targetQuantity - currentQuantity, 1);
+            var representative = existingSuggestion is null
+                ? members.OrderBy(product => product.Name).First()
+                : members.Single(product => product.Id == existingSuggestion.ProductId);
             if (existingSuggestion is null)
             {
                 var suggestion = CreateSuggestion(
                     list.Id,
-                    product.Id,
-                    product.Name,
+                    representative.Id,
+                    productGroup.Name,
                     suggestedQuantity,
                     now);
                 list.Items.Add(suggestion);
@@ -120,9 +133,40 @@ public sealed class ShoppingListService(ApplicationDbContext db, TimeProvider ti
                 continue;
             }
 
-            existingSuggestion.Name = product.Name;
+            existingSuggestion.Name = productGroup.Name;
             existingSuggestion.Quantity = suggestedQuantity;
             existingSuggestion.UpdatedAt = now;
+        }
+
+        foreach (var product in products.Where(product => product.ProductGroupId == null && product.ReorderPoint != null))
+        {
+            var currentQuantity = quantities.GetValueOrDefault(product.Id);
+            if (currentQuantity >= product.ReorderPoint!.Value)
+            {
+                continue;
+            }
+
+            var existingSuggestion = list.Items.FirstOrDefault(item =>
+                item.ProductId == product.Id && item.Source == ShoppingItemSource.ReorderSuggestion);
+            if (existingSuggestion is { Status: ShoppingItemStatus.Dismissed or ShoppingItemStatus.Purchased })
+            {
+                continue;
+            }
+
+            var targetQuantity = product.TargetQuantity ?? product.ReorderPoint.Value;
+            var suggestedQuantity = Math.Max(targetQuantity - currentQuantity, 1);
+            if (existingSuggestion is null)
+            {
+                var suggestion = CreateSuggestion(list.Id, product.Id, product.Name, suggestedQuantity, now);
+                list.Items.Add(suggestion);
+                db.ShoppingListItems.Add(suggestion);
+            }
+            else
+            {
+                existingSuggestion.Name = product.Name;
+                existingSuggestion.Quantity = suggestedQuantity;
+                existingSuggestion.UpdatedAt = now;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
