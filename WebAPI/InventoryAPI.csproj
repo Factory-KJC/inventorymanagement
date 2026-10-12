@@ -17,4 +17,18 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="wwwroot\icon.svg" />
+    <Content Include="..\Assets\Branding\home_stock_icon.svg"
+             Link="wwwroot\icon.svg"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="CopySharedBrandAssets" BeforeTargets="PrepareForBuild">
+    <Copy SourceFiles="..\Assets\Branding\home_stock_icon.svg"
+          DestinationFiles="wwwroot\icon.svg"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
